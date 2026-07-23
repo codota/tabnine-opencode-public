@@ -1,0 +1,40 @@
+name: Close external pull requests
+
+# This repository is for releases and issue tracking only and does not accept
+# code contributions. Forking (and therefore opening a PR) cannot be disabled on
+# a public repository, so any pull request opened by someone who is not an org
+# member or collaborator is closed automatically with a pointer to the issue tracker.
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.pull_request.author_association != 'OWNER' &&
+      github.event.pull_request.author_association != 'MEMBER' &&
+      github.event.pull_request.author_association != 'COLLABORATOR'
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const number = context.payload.pull_request.number;
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: number,
+              body: [
+                "Thanks for your interest in the Tabnine plugin for opencode.",
+                "",
+                "This repository is for releases and issue tracking only and does not accept code contributions, so this pull request is being closed automatically.",
+                "",
+                "If you have a bug or a feature request, please open an issue instead: https://github.com/codota/tabnine-opencode-public/issues/new/choose",
+              ].join("\n"),
+            });
+            await github.rest.pulls.update({
+              owner, repo, pull_number: number, state: "closed",
+            });
