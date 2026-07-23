@@ -1,0 +1,90 @@
+name: Bug report
+description: Report a problem with the Tabnine plugin for opencode (tabnine-opencode)
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. Please fill in the sections below.
+        Before you start, search existing issues to check this has not already been reported.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you begin
+      options:
+        - label: I searched existing issues and this has not been reported yet.
+          required: true
+        - label: This is not a security vulnerability (those go to security@tabnine.com, see SECURITY.md).
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `tabnine-opencode --version`.
+      placeholder: "tabnine-opencode 0.4.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows
+    validations:
+      required: true
+  - type: dropdown
+    id: arch
+    attributes:
+      label: Architecture
+      options:
+        - x64
+        - arm64
+        - Not sure
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: A numbered list of the exact actions that trigger the bug. Include any sample input.
+      placeholder: |
+        1. Run `tabnine-opencode ...`
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: What you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: What actually happened. Include the full error message if there was one.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs and evidence
+      description: |
+        Attach anything that helps us reproduce the problem: screenshots, a screen recording, or debug logs.
+        To capture a debug log, set `TABNINE_DEBUG=1` (and optionally `TABNINE_LOG_FILE=<path>`) and rerun the command, then attach the log.
+        Do not include secrets or access tokens.
+      render: shell
+    validations:
+      required: false
