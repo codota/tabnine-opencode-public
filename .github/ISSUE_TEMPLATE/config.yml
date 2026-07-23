@@ -4,8 +4,8 @@ contact_links:
     url: https://docs.tabnine.com
     about: Installation, sign-in, and usage instructions for the Tabnine plugin for opencode.
   - name: Security vulnerability
-    url: https://github.com/codota/tabnine-opencode-public/blob/main/SECURITY.md
-    about: Report security issues privately by email, not as public issues.
+    url: https://support.tabnine.com/hc/en-us/articles/19766967102097-Vulnerability-Responsible-Disclosure
+    about: Report security issues through Tabnine's responsible disclosure process, not as public issues.
   - name: Tabnine support
     url: mailto:support@tabnine.com
     about: Account, licensing, or deployment questions.
