@@ -15,7 +15,7 @@ body:
       options:
         - label: I searched existing issues and this has not been reported yet.
           required: true
-        - label: This is not a security vulnerability (those go to security@tabnine.com, see SECURITY.md).
+        - label: This is not a security vulnerability (those follow the responsible disclosure process in SECURITY.md, not public issues).
           required: true
   - type: input
     id: version
