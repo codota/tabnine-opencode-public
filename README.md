@@ -16,6 +16,10 @@ Installation, sign-in, and usage instructions are in the documentation:
 
 Supported platforms: macOS (x64, arm64), Linux (x64, arm64), and Windows (x64, arm64).
 
+## Migrate from Tabnine CLI
+
+If you're switching from Tabnine CLI (or Gemini CLI), the [Migration helper](migration_helper/README.md) copies your MCP servers, skills, subagents, and slash commands into opencode. It runs as an interactive wizard inside opencode itself and never overwrites files without asking.
+
 ## Report a bug or request a feature
 
 Please use the issue templates:
