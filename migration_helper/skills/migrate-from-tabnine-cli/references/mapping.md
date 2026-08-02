@@ -24,18 +24,29 @@ Field-by-field:
 | Tabnine key | opencode key | Rule |
 | --- | --- | --- |
 | `url` | `url` | Set `type: "remote"`. |
-| `httpUrl` | `url` | Same as `url`. Set `type: "remote"`. |
+| `httpUrl` | `url` | Same as `url` (deprecated Tabnine alias). Set `type: "remote"`. |
 | `command` (string) + `args` (array) | `command` (array) | Combine into a single array: `[command, ...args]`. Set `type: "local"`. |
-| `env` | `env` | Copy verbatim. Both accept `{env:VAR}` interpolation. |
-| `headers` | `headers` | Copy verbatim. Both accept `{env:VAR}` interpolation. |
+| `env` | `environment` | **Rename — opencode's key is `environment`, not `env`.** An `env` key is silently ignored and the server starts without its variables. Values: see the env-var interpolation rule below. |
+| `headers` | `headers` | Copy, applying the env-var interpolation rule below. Remote servers only. |
 | `type: "sse" \| "http"` | — | Not needed. opencode uses `type: "remote"` for both; the client negotiates transport. |
-| `cwd` | — | Not supported by opencode's MCP config. Warn. |
-| `timeout` | — | Not per-server in opencode. There's an `experimental.mcp_timeout` for all servers. |
+| `cwd` | `cwd` | Copy verbatim. Local servers only. |
+| `timeout` | `timeout` | Copy verbatim. Both are milliseconds; opencode's default is 5000 if absent. |
 | `trust` | — | opencode uses permissions instead. Drop; the user grants tool access at runtime. |
 | `description` | — | Drop (opencode ignores it). |
 | `includeTools` / `excludeTools` | — | Not supported. Drop; opencode surfaces all tools from an MCP. |
 | `authProviderType` | — | Not supported. Drop. |
 | `oauth` (Tabnine's built-in OAuth flow) | — | Drop. opencode expects the MCP itself to handle OAuth on first connect. |
+
+### Env-var interpolation in values
+
+The two systems use different placeholder syntax inside string values:
+
+- Tabnine CLI expands `$VAR` and `${VAR}` when it loads settings.
+- opencode expands `{env:VAR}` (and `{file:path}`) when it loads `opencode.json`. A literal `$VAR` is passed through untouched.
+
+When a migrated value (in `environment`, `headers`, `url`, or `command`) contains `$VAR` or `${VAR}`, rewrite it to `{env:VAR}`. Example: `"Authorization": "Bearer $MCP_TOKEN"` → `"Authorization": "Bearer {env:MCP_TOKEN}"`. Values that contain no `$` placeholders copy verbatim.
+
+This rule is unconditional: it applies to every `$NAME`/`${NAME}` substring anywhere inside a value — including inside larger strings like `"Bearer $TOKEN"`, and equally in `headers` and `environment`. Do not reason that a particular `$NAME` "looks like a literal" and keep it — Tabnine expanded it at load time, so a kept `$NAME` reaches the server as a dead literal in opencode. The only exception is a value the user explicitly confirms is a literal dollar string.
 
 Per-server enablement (`~/.tabnine/agent/mcp-server-enablement.json`):
 
@@ -45,6 +56,12 @@ Per-server enablement (`~/.tabnine/agent/mcp-server-enablement.json`):
 
 Absent name → `enabled: true` (opencode default; you can omit the field).
 
+Edge cases:
+
+- Tabnine normalizes enablement keys to lowercase and trims whitespace — match case-insensitively against server names.
+- Extension-bundled servers appear under an `ext:<name>` key (plain `<name>` also accepted for back-compat).
+- Stale entries happen (a key with no matching server in `mcpServers`, e.g. a server the user deleted). Ignore them — never invent a server to match an enablement entry.
+
 ### Example translation
 
 Source (`~/.tabnine/agent/settings.json`):
@@ -53,7 +70,13 @@ Source (`~/.tabnine/agent/settings.json`):
 {
   "mcpServers": {
     "AtlassianMCP": { "url": "https://mcp.atlassian.com/v1/mcp" },
-    "playwright":   { "command": "npx", "args": ["-y", "@playwright/mcp"] }
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp"],
+      "env": { "PW_TOKEN": "$PLAYWRIGHT_TOKEN" },
+      "cwd": "/Users/me/proj",
+      "timeout": 30000
+    }
   }
 }
 ```
@@ -78,6 +101,9 @@ Target (`~/.config/opencode/opencode.json`):
     "playwright": {
       "type": "local",
       "command": ["npx", "-y", "@playwright/mcp"],
+      "environment": { "PW_TOKEN": "{env:PLAYWRIGHT_TOKEN}" },
+      "cwd": "/Users/me/proj",
+      "timeout": 30000,
       "enabled": false
     }
   }
@@ -91,7 +117,7 @@ Direct copy. Both systems use `SKILL.md` with the same required frontmatter fiel
 Do not rewrite:
 
 - Skill bodies. If a skill references Gemini binaries, that's a semantic change and the user should decide.
-- The `name` field. It must stay unique across all scanned paths; opencode logs a warning on collision.
+- The `name` field. It must stay unique across all scanned paths. On collision opencode only logs a warning (the user never sees it) and which copy wins is non-deterministic — so a duplicate is a silent coin-flip, not a visible error. Avoid creating one.
 
 Optional frontmatter fields opencode also accepts (see `customize-opencode`): `license`, `compatibility`, `metadata`. Preserve if present, remove none.
 
@@ -114,7 +140,7 @@ Split frontmatter and body. Translate frontmatter. Body copies verbatim.
 | `description` | `description` | Keep. |
 | `display_name` | — | Drop. |
 | `tools` | — | Drop. opencode uses `permission` (per-tool allow/ask/deny). If the user wants an equivalent, ask before generating a permission block; don't guess. |
-| `mcp_servers` | — | Drop from the agent frontmatter. Ask the user if these should be hoisted into top-level `mcp` in `opencode.json` (they'll then be visible to all agents, not just this one). |
+| `mcp_servers` | — | Drop from the agent frontmatter. Ask the user if these should be hoisted into top-level `mcp` in `opencode.json` (they'll then be visible to all agents, not just this one). Note the frontmatter variant uses snake_case keys (`http_url`, `include_tools`, `exclude_tools`) — translate them like their camelCase settings.json equivalents. |
 | `model: inherit` | — | Drop. Subagents inherit from parent by default; primaries fall back to global `model`. |
 | `model: <provider>/<id>` | `model` | Keep if the value is already `provider/model-id` format. |
 | `model: <plain name>` (e.g. `claude-4-opus`, `Claude 4.8 Opus`) | — | Drop. opencode requires the provider prefix; a plain name will fail validation. |
@@ -200,14 +226,15 @@ Check @README.md for the runbook.
 | — | `$1`, `$2`, … | opencode adds positional args. Tabnine has no direct equivalent; if the source uses split-args logic in `prompt`, leave a TODO comment for the user. |
 | `!{shell command}` | ``!`shell command` `` | Both allow shell injection. opencode uses backtick syntax. |
 | `@{file/path}` | `@file/path` | Both allow file injection. opencode drops the braces. |
+| (no placeholder at all) | (no placeholder at all) | Copy as-is. Both systems automatically append the user's arguments when the prompt contains no placeholder — do not insert `$ARGUMENTS`. |
 
 ### Namespacing
 
-Tabnine command namespaces (from nested folders) use `:` (e.g. `foo:bar`). opencode uses folder structure directly (`command/foo/bar.md` → `/foo/bar`) or filename-mangling. Either preserve the folder structure or flatten with a hyphen — ask the user.
+Tabnine derives namespaced command names from nested folders using `:` (`commands/foo/bar.toml` → `foo:bar`). opencode derives them from folder structure using `/` (`command/foo/bar.md` → `/foo/bar`). Mirror the source folder structure — `commands/foo/bar.toml` becomes `<target>/command/foo/bar.md` — so `foo:bar` in Tabnine is `/foo/bar` in opencode. Mention the renamed invocation in the summary. Do not flatten names.
 
 ## Extensions
 
-opencode has no extension bundle format. Unpack:
+opencode has no extension bundle format. Before unpacking, check `~/.tabnine/agent/extensions/extension-enablement.json` — skip extensions the user has disabled there (offer them only if the user asks). Then unpack:
 
 - Each `mcpServers` entry → treat as a top-level MCP (rules above). If the extension name should be preserved, prefix: `<ext>-<original-name>`.
 - Each `skills/*/SKILL.md` → treat as a normal skill.

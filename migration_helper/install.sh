@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Install the migrate-from-tabnine-cli skill and /migrate slash command
-# into an opencode configuration directory.
+# Install the Tabnine CLI migration skills (migrate-from-tabnine-cli,
+# migrate-tabnine-context) and their slash commands (/migrate,
+# /migrate-context) into an opencode configuration directory.
 #
 # Usage:
 #   ./install.sh                 # install globally into ~/.config/opencode/
@@ -35,13 +36,14 @@ Options:
     --project    Install into ./.opencode/ (project scope) instead of
                  ~/.config/opencode/ (global scope, the default).
     --overwrite  Overwrite existing target files without prompting.
-                 Diffs are still printed.
     --help, -h   Show this message and exit.
 
-The installer copies two things:
+The installer copies:
 
     skills/migrate-from-tabnine-cli/  -> <target>/skills/migrate-from-tabnine-cli/
+    skills/migrate-tabnine-context/   -> <target>/skills/migrate-tabnine-context/
     commands/migrate.md               -> <target>/commands/migrate.md
+    commands/migrate-context.md       -> <target>/commands/migrate-context.md
 
 Where <target> is either ~/.config/opencode or ./.opencode.
 
@@ -64,9 +66,20 @@ done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [[ ! -d "$SCRIPT_DIR/skills/migrate-from-tabnine-cli" ]] || [[ ! -f "$SCRIPT_DIR/commands/migrate.md" ]]; then
+SKILLS="migrate-from-tabnine-cli migrate-tabnine-context"
+COMMANDS="migrate.md migrate-context.md"
+
+MISSING=0
+for skill in $SKILLS; do
+    [[ -d "$SCRIPT_DIR/skills/$skill" ]] || MISSING=1
+done
+for cmd in $COMMANDS; do
+    [[ -f "$SCRIPT_DIR/commands/$cmd" ]] || MISSING=1
+done
+
+if [[ "$MISSING" -eq 1 ]]; then
     echo "Error: could not find source files next to this script." >&2
-    echo "Expected: $SCRIPT_DIR/skills/migrate-from-tabnine-cli/ and $SCRIPT_DIR/commands/migrate.md" >&2
+    echo "Expected under $SCRIPT_DIR: skills/{$(echo $SKILLS | tr ' ' ',')}/ and commands/{$(echo $COMMANDS | tr ' ' ',')}" >&2
     echo "" >&2
     echo "If you ran this via 'curl | bash', download the repo first:" >&2
     echo "    git clone https://github.com/codota/tabnine-opencode-public" >&2
@@ -124,6 +137,12 @@ install_file() {
     diff -u "$dst" "$src" || true
     echo "  ---"
 
+    # -r /dev/tty is true even without a controlling terminal; test the open itself.
+    if ! ( : < /dev/tty ) 2>/dev/null; then
+        echo "  skipped    $dst (no terminal to prompt on; re-run interactively or use --overwrite)"
+        return
+    fi
+
     while true; do
         read -rp "  [s]kip, [o]verwrite, or [r]ename existing and install? " choice </dev/tty
         case "$choice" in
@@ -157,19 +176,22 @@ install_file() {
 # Copy skill directory (recursive)
 # -----------------------------------------------------------------------------
 
-echo "Skill: migrate-from-tabnine-cli"
-
-# Walk the source skill directory and install each file individually so
+# Walk each source skill directory and install each file individually so
 # collisions are handled per file, not silently overwritten as a tree.
-while IFS= read -r -d '' src_file; do
-    rel_path="${src_file#$SCRIPT_DIR/skills/}"
-    dst_file="$TARGET_DIR/skills/$rel_path"
-    install_file "$src_file" "$dst_file"
-done < <(find "$SCRIPT_DIR/skills/migrate-from-tabnine-cli" -type f -print0)
+for skill in $SKILLS; do
+    echo "Skill: $skill"
+    while IFS= read -r -d '' src_file; do
+        rel_path="${src_file#$SCRIPT_DIR/skills/}"
+        dst_file="$TARGET_DIR/skills/$rel_path"
+        install_file "$src_file" "$dst_file"
+    done < <(find "$SCRIPT_DIR/skills/$skill" -type f -print0)
+    echo ""
+done
 
-echo ""
-echo "Command: migrate.md"
-install_file "$SCRIPT_DIR/commands/migrate.md" "$TARGET_DIR/commands/migrate.md"
+for cmd in $COMMANDS; do
+    echo "Command: $cmd"
+    install_file "$SCRIPT_DIR/commands/$cmd" "$TARGET_DIR/commands/$cmd"
+done
 
 # -----------------------------------------------------------------------------
 # Done
@@ -179,6 +201,7 @@ echo ""
 echo "Done."
 echo ""
 echo "Quit and restart opencode for these changes to take effect."
-echo "Then invoke the wizard with:"
-echo "    /migrate"
+echo "Then invoke the wizards with:"
+echo "    /migrate           (MCP servers, skills, agents, commands, extensions)"
+echo "    /migrate-context   (TABNINE.md context files -> AGENTS.md)"
 echo "or by asking opencode to migrate your Tabnine CLI configuration."

@@ -37,7 +37,7 @@ Settings are loaded from four tiers, deep-merged (`packages/cli/src/config/setti
 | User | `~/.tabnine/agent/settings.json` |
 | Workspace | `<cwd>/.tabnine/agent/settings.json` |
 
-Read the `mcpServers` object from each; workspace wins. The wizard should read at minimum User and Workspace.
+Read the `mcpServers` object from each. Merge precedence (from `mergeSettings`, `settings.ts:277-302`): schema defaults → system defaults → user → workspace → **system last, which wins over everything** — on managed machines an admin's system settings override the user's. The wizard should read at minimum User and Workspace; if a system file exists, mention that its entries take precedence in Tabnine and may be admin-managed (probably not the user's to migrate).
 
 Shape of each entry (`packages/cli/src/config/settingsSchema.ts:161-174`, values from Gemini upstream `MCPServerConfig`):
 
@@ -65,7 +65,9 @@ Shape of each entry (`packages/cli/src/config/settingsSchema.ts:161-174`, values
 
 Extensions live at `~/.tabnine/agent/extensions/<name>/` and `<cwd>/.tabnine/agent/extensions/<name>/`. Manifest filename: `tabnine-extension.json` in Tabnine mode, `gemini-extension.json` in Gemini mode (`packages/core/src/config/storage.ts:446-456`).
 
-Manifest schema (`packages/cli/src/config/extension.ts:24-49`): `{ name, version, mcpServers?, contextFileName?, excludeTools?, installMetadata? }`. Extensions can also ship `<ext>/skills/`, `<ext>/agents/`, `<ext>/commands/` directories that the extension loader picks up (`packages/cli/src/config/extension-manager.ts:837-994`).
+Manifest schema (`packages/cli/src/config/extension.ts:24-49`): `{ name, version, mcpServers?, contextFileName?, excludeTools?, settings?, themes?, plan? }`. Install metadata lives in a separate sibling file (`.tabnine-extension-install.json`), not in the manifest. Extensions can also ship `<ext>/skills/`, `<ext>/agents/`, `<ext>/commands/` directories that the loaders pick up (`packages/cli/src/config/extension-manager.ts:837-994`, `FileCommandLoader.ts:231-243`).
+
+Per-extension enable/disable state lives in `~/.tabnine/agent/extensions/extension-enablement.json` — skip disabled extensions by default when unpacking.
 
 ### Source 3: Agent-declared MCP servers (`mcp_servers` frontmatter)
 
@@ -92,6 +94,8 @@ These are already the same servers opencode's Tabnine plugin registers. **Do not
 
 Absence of a key means enabled. This is user disables, not admin policy. Apply directly to opencode's `mcp.<name>.enabled`.
 
+Gotchas: keys are normalized to lowercase/trimmed, so match server names case-insensitively; extension-bundled servers appear as `ext:<name>` (plain `<name>` also accepted); stale keys with no matching server can linger after a server is deleted — ignore them.
+
 ### Additional filters (rarely present, worth checking)
 
 Settings can also carry `mcp.allowed` (allowlist) and `mcp.excluded` (blocklist) arrays (`settingsSchema.ts:1916-1955`), and `admin.mcp.enabled` (kill switch). If any of these are set, respect them when building the migration list: don't migrate servers the user has explicitly excluded, and warn if `admin.mcp.enabled: false` is set (Tabnine had MCPs disabled entirely — the user probably still wants to migrate the definitions, but should know).
@@ -110,6 +114,8 @@ Loader: `packages/core/src/skills/skillLoader.ts`. Discovery order in `packages/
 Filename glob (`skillLoader.ts:127`): `['SKILL.md', '*/SKILL.md']` — SKILL.md must be uppercase, at the root or one level deep in the skills dir.
 
 Frontmatter validation: only `name` (required) and `description` (required) are checked (`skillLoader.ts:34-192`). Same requirements as opencode, so bodies copy verbatim.
+
+Skill names have **no format regex** in Tabnine (only filesystem-hostile characters `: \ / < > * ? " |` are sanitized to `-`), so underscores, uppercase, and spaces can appear. opencode's code accepts these too, but its documented contract is `^[a-z0-9]+(-[a-z0-9]+)*$` — see the normalization step in the skill.
 
 Settings that gate skills:
 
@@ -178,7 +184,7 @@ agent_card_url: url    # exactly one of these two required
 agent_card_json: string
 ```
 
-Array frontmatter is also accepted (multiple remote agents in one file). opencode has no direct equivalent for A2A agents — skip these with a warning, or convert to a subagent that calls the remote endpoint via a tool if the user asks.
+Array frontmatter is also accepted (multiple remote agents in one file). Discovery implication: if the first frontmatter block of an agent `.md` parses as a YAML array, treat the whole file as a remote-agent bundle immediately — don't try to read `name`/`description` off it. opencode has no direct equivalent for A2A agents — skip these with a warning, or convert to a subagent that calls the remote endpoint via a tool if the user asks.
 
 ### Agent overrides in settings
 
@@ -207,3 +213,4 @@ Skill-as-command loader (`packages/cli/src/services/SkillCommandLoader.ts`) also
 - opencode's Tabnine plugin already registers `tabnine-context` and `tabnine-coaching` MCP servers. Do not migrate those.
 - opencode's Tabnine plugin already provides Tabnine authentication, so `~/.tabnine/tabnine_creds.json` and `~/.tabnine/agent/tabnine-credentials.json` should not be touched.
 - OAuth tokens in `~/.tabnine/agent/mcp-oauth-tokens.json` are Tabnine-CLI-specific and will not carry over to opencode. The user re-authenticates each MCP on first use.
+- Context/memory files (`TABNINE.md` at the project root and `~/.tabnine/agent/TABNINE.md` globally, plus any custom `context.fileName` names) are handled by the separate `migrate-tabnine-context` skill (`/migrate-context`), not this wizard. If discovery notices them, point the user there.
