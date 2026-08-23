@@ -27,7 +27,9 @@ You are migrating the user's Tabnine CLI context/memory files into opencode's `A
    The global target is always `~/.config/opencode/AGENTS.md`, even when `OPENCODE_CONFIG_DIR` is set. opencode resolves the global instruction file from its config root only, so unlike skills and agents — which load from both directories — an `AGENTS.md` inside an `OPENCODE_CONFIG_DIR` such as `~/.tabnine/opencode/config` is never read. Never write one there.
 
    Check for that mistake while discovering. If `OPENCODE_CONFIG_DIR` is set and an `AGENTS.md` already exists inside it, report it as present but never loaded, and offer to move its content to `~/.config/opencode/AGENTS.md` — as a merge, through the normal plan and backup flow. It is the one case where this skill's source is an opencode file rather than a Tabnine one, so state plainly where the content came from and leave the original in place unless the user asks otherwise.
-3. If a configured name is already one opencode reads natively, report it as "no migration needed" and skip. opencode reads `AGENTS.md`, `CLAUDE.md`, and `CONTEXT.md` in each directory it walks, plus `~/.claude/CLAUDE.md` globally. A user whose `context.fileName` is `CONTEXT.md` needs no migration at all.
+3. If a configured name is already `AGENTS.md`, opencode reads it natively — report it as "no migration needed" and skip.
+
+The sources this skill migrates are Tabnine CLI's context files: `TABNINE.md` by default, `GEMINI.md` in legacy Gemini mode, or whatever `context.fileName` specifies. Nothing else is in scope.
 
 ### Subdirectory context loads differently
 
