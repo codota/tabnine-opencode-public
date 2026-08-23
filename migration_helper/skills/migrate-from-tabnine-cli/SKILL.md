@@ -68,6 +68,8 @@ Then ask what the user wants to migrate — one category at a time.
 Use the `question` tool. Order:
 
 1. **Target scope for this session** — global (`~/.config/opencode/`) or project (`./.opencode/` in the current worktree). Ask once at the start of the session. If the user later says something like "put this one in the project instead", re-scope only that category and keep the session default for the rest.
+
+   Do not let `OPENCODE_CONFIG_DIR` confuse this choice. Some distributions set it (the Tabnine opencode wrapper points it at `~/.tabnine/opencode/config`), which looks like it redirects the global root. It does not. Verified by pointing the variable at a scratch dir and running `opencode debug paths`, `debug skill`, `agent list`, and `debug config`: the reported `config` path stays `~/.config/opencode`, and that directory's `skills/`, `agents/`, and `opencode.json` are still loaded. The override **adds a second root** — skills, agents, and `opencode.json` inside it are also scanned and merged. So `~/.config/opencode/` is always a valid global target. If the user would rather keep a vendor-managed install self-contained and target the override dir instead, that works too. Install into exactly one of the two: the same `name` present in both roots is a duplicate, and opencode resolves duplicates non-deterministically.
 2. **MCP servers** — multi-select from the discovered list. Warn on any name conflict with an existing `mcp.<name>` in the target `opencode.json`.
 3. **Skills** — multi-select. Warn on any target-folder collision.
 4. **Agents** — multi-select. For each selected agent, ask a follow-up: `subagent` (default) or `primary` mode, using exactly this explanation: "primary agents are user-facing entry points the user can switch to and chat with directly; subagents are only invoked by another agent as a delegated task." (opencode also has `mode: all` — don't offer it; suggest it only if the user asks for both behaviors.)
@@ -99,9 +101,23 @@ If the target `opencode.json` exists, copy it to `opencode.json.bak-<YYYYMMDD-HH
 
 Copy the entire skill folder (SKILL.md and all sibling files) to `<target>/skills/<name>/`. Frontmatter is compatible verbatim — both systems require `name` and `description`. Do not edit the SKILL.md, with one exception below.
 
+Frontmatter sanity check (advisory, never silent): after copying, try parsing the frontmatter as strict YAML. The common defect is an unquoted `description` containing a colon-space, e.g. `description: reduces mistakes: think before coding`, which strict YAML rejects as a nested mapping. Current opencode builds parse it anyway, so the skill still loads — do not present this as breakage. Report it as "loads today, but one parser change from breaking" and offer to wrap the value in double quotes (escaping any inner quotes). Only edit with the user's approval; the source file has the same defect, so leaving it is a legitimate choice.
+
 Name normalization (the exception): opencode's documented name format is `^[a-z0-9]+(-[a-z0-9]+)*$` (lowercase, hyphen-separated). Tabnine allows underscores, uppercase, and spaces in skill and agent names. Current opencode builds load nonconforming names anyway, but they're outside the documented contract and may break in a future version. If a selected skill or agent has a nonconforming `name`, offer to normalize it (lowercase, `_` and spaces → `-`) in both the `name` field and the target folder/file name — with the user's confirmation, never silently.
 
-After copying each selected skill, grep its body (and sibling files) for Gemini-specific tokens: `gemini -p`, `gemini `, `tui-tester`, `GEMINI.md`, `.gemini/`. Do **not** rewrite anything — rewriting prompts changes semantics. Record each hit and report the affected skills in the Phase 4 summary, one line each, so the user can fix them later.
+After copying each selected skill, grep its body (and sibling files) for Gemini-specific references. Do **not** rewrite anything — rewriting prompts changes semantics. Sort hits into two buckets, because they need different follow-up:
+
+**Broken invocations** — a command the skill tells the agent to run that won't exist under opencode. Match the CLI actually being invoked, not the bare word:
+
+```
+(^|[`$(\s])gemini\s+(-p|--prompt|-y|--yolo|chat|mcp|extensions)\b
+(^|[`$(\s])(npx\s+)?@google/gemini-cli\b
+\btui-tester\b
+```
+
+**Path and filename mentions** — `GEMINI.md`, `.gemini/`, `~/.gemini`. These are usually deliberate prose (a docs skill legitimately discusses upstream paths), so report them as "mentions to review", never as defects.
+
+A bare `gemini ` substring match is too loose — it fires on ordinary sentences like "reconcile the upstream Gemini CLI release" and produces false alarms. Report both buckets in the Phase 4 summary, one line each, labelled distinctly.
 
 ### Agents
 
@@ -170,6 +186,26 @@ After all writes succeed, print a summary:
 - OAuth reminder for any migrated remote MCP servers (Atlassian, Mixpanel, GitHub, etc.): tokens do not carry over.
 - If Tabnine context files exist (`TABNINE.md` in the project or `~/.tabnine/agent/`): "Your TABNINE.md context files weren't part of this migration — run `/migrate-context` to move them into AGENTS.md."
 - **Restart reminder**: "Quit and restart opencode for these changes to take effect. Running sessions keep using the already-loaded config."
+- **Offer** the optional verification in Phase 5 below — one line, e.g. "I can verify these actually load after you restart — say the word." Do not run it uninvited.
+
+## Phase 5 — Verification (optional, only if the user asks)
+
+Skip this entirely unless the user asks for it. It requires a restart to be meaningful: the commands read config from disk, so running them before the user restarts still reflects the new files, but the user's *running* session does not.
+
+Three commands settle whether opencode actually loaded the migration. Run them from the project directory, and export `OPENCODE_CONFIG_DIR` first if the user's launcher sets it, so you reproduce their real environment:
+
+```
+opencode debug paths    # confirms which directory is the global config root
+opencode debug skill    # JSON: every loaded skill with its resolved location
+opencode agent list     # loaded agents and their mode
+opencode debug agent <name>   # one agent's resolved mode, steps, model, prompt
+```
+
+Check that each migrated skill appears with a `location` under the target you wrote to, that its `description` and `content` are non-empty (proves the frontmatter parsed), and that each migrated agent is listed with the mode the user chose. `debug agent` additionally confirms `steps` survived the `max_turns` rename and that no stale `model` is pinned.
+
+Worth verifying on disk at the same time, since neither command covers it: the migrated skill folders are byte-identical to their Tabnine sources, relative `references/…` links inside the bodies resolve, and no skill `name` is duplicated across the scanned roots.
+
+Report failures as findings and ask before changing anything — Phase 4 already ended the write window (core rule 7).
 
 Note about Claude Code skills at `~/.claude/skills`: opencode auto-scans this path already. Do NOT copy skills from there into `~/.config/opencode/skills/` unless the user explicitly asks — you'd end up with two copies of the same name, and opencode resolves duplicates by a coin-flip (the "winner" is non-deterministic and the warning is only written to logs). If discovery finds Claude Code skills, tell the user they're already visible to opencode and skip them by default.
 
