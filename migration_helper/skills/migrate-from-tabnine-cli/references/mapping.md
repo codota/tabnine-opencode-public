@@ -174,7 +174,7 @@ description: Manage Jira issues …
 You are a Jira and Confluence management specialist. …
 ```
 
-Target (`~/.config/opencode/agent/jira-issue-manager.md`), with the user picking `subagent` mode:
+Target (`~/.config/opencode/agents/jira-issue-manager.md`), with the user picking `subagent` mode:
 
 ```markdown
 ---
@@ -188,6 +188,10 @@ You are a Jira and Confluence management specialist. …
 ```
 
 Dropped: `model: inherit` (no-op), `timeout_mins: 5` (no equivalent).
+
+### Target folder name
+
+opencode's agent loader globs `{agent,agents}/**/*.md`, so `agent/` and `agents/` are both valid and nested subfolders are scanned too. Write new agents to the plural `agents/`, matching the agents documentation and `opencode agent create`. If the target already uses the singular `agent/`, add to it rather than migrating the existing files across.
 
 ## Commands
 

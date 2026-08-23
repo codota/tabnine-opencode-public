@@ -15,6 +15,8 @@ You are running an interactive migration wizard. The user has Tabnine CLI (or Ge
 4. **Never touch the source files.** This is a copy-and-translate flow, not a move. The user should be able to keep using Tabnine CLI after.
 5. **Validate translations against opencode's schema before writing.** If unsure about a field's shape, fetch `https://opencode.ai/config.json`; the built-in `customize-opencode` skill (bundled with opencode) is a faster shortcut when available.
 6. **Remind the user to restart opencode at the end.** opencode does not hot-reload config.
+7. **Stop writing once the wizard finishes.** After the Phase 4 summary, the migration is over. If a later question or a doc you read suggests a different layout, say so and ask — never move, rename, or rewrite an already-migrated file on your own initiative. A follow-up question is not authorization to change the filesystem.
+8. **Separate verified facts from judgment calls.** Say "the docs show X, the skill says Y, I picked Y because Z" rather than asserting one as settled. If a claim in this skill contradicts what you observe, report the conflict instead of silently correcting either side.
 
 ## Phase 1 — Discover
 
@@ -120,7 +122,7 @@ Field mapping (drop anything not listed):
 | `mcp_servers` | — | Drop. opencode agents cannot declare private MCPs. Offer to move the definitions into top-level `mcp` in `opencode.json`. |
 | — | `mode` | Add. Use the value the user chose in Phase 2 (`subagent` or `primary`). |
 
-Write to `<target>/agent/<name>.md` (opencode also accepts `agents/`, but the singular form is canonical in the schema examples — pick one and stick with it; if the target already has a plural folder, use that).
+Write to `<target>/agents/<name>.md`. opencode's loader globs `{agent,agents}/**/*.md`, so both spellings are loaded and neither is more correct than the other. Prefer the plural `agents/`: it's the form the agents documentation uses in every example and the form `opencode agent create` writes, so a user who later cross-checks the docs won't find a mismatch. If the target already has a singular `agent/` folder, write there instead and leave it alone — do not consolidate or move existing files to match this preference.
 
 ### Commands
 
@@ -177,7 +179,7 @@ Note about Claude Code skills at `~/.claude/skills`: opencode auto-scans this pa
 - **A migrated skill behaves inconsistently or seems to "flip" between versions**: two skills with the same `name` exist in scanned paths — opencode only logs a warning and which copy wins is non-deterministic. Rename one or delete the older copy.
 - **`ConfigInvalidError` after the MCP merge specifically**: restore the `opencode.json.bak-<timestamp>` backup written before the merge, then retry.
 - **MCP server appears but returns auth errors**: normal on first use — re-authenticate via the MCP's OAuth flow. Do not attempt to copy tokens from `~/.tabnine/agent/mcp-oauth-tokens.json`.
-- **User wants to reverse the migration**: the wizard doesn't delete Tabnine sources, so reversing means deleting the newly created files under `<target>/{mcp entries, skills/*, agent/*.md, command/*.md}`. Offer to list them if asked.
+- **User wants to reverse the migration**: the wizard doesn't delete Tabnine sources, so reversing means deleting the newly created files under `<target>/{mcp entries, skills/*, agents/*.md, command/*.md}`. Offer to list them if asked.
 
 ## Reference material
 
