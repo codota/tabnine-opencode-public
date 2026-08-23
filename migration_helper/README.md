@@ -1,6 +1,8 @@
 # Migration helper: Tabnine CLI to opencode
 
-Copies your Tabnine CLI (or Gemini CLI) configuration into an opencode configuration directory. Runs as interactive wizards inside opencode itself: they scan your disk, show what they found, ask what to migrate, translate fields that differ between the two systems, and never overwrite an existing file without asking.
+Copies your Tabnine CLI (or Gemini CLI) configuration into an opencode configuration directory. These are interactive wizards that run inside opencode: each one scans your disk, shows what it found, and asks what you want to migrate.
+
+Every write is shown to you for approval before it happens, and no existing file is replaced without your consent and a timestamped backup.
 
 Nothing is deleted from your Tabnine CLI installation. This is a copy-and-translate flow. You can keep using Tabnine CLI after.
 
@@ -11,7 +13,13 @@ Two skills are included:
 
 ## What gets migrated
 
-MCP servers, skills, subagents, slash commands, the contents of Tabnine CLI extensions, and context files (`TABNINE.md` → `AGENTS.md`, via the second skill). Fields that have no opencode equivalent are dropped with a note. See `skills/migrate-from-tabnine-cli/references/mapping.md` for the complete field-by-field translation table.
+MCP servers, skills, subagents, slash commands, the contents of Tabnine CLI extensions, and context files (`TABNINE.md` → `AGENTS.md`, via the second skill). Fields with no opencode equivalent are dropped and listed in the summary. See `skills/migrate-from-tabnine-cli/references/mapping.md` for the complete field-by-field translation table.
+
+Two translations change values rather than copying them, and the wizard reports both when it runs.
+
+Agent tool restrictions are preserved. A Tabnine agent that limits itself to a list of tools becomes an opencode agent with an equivalent `permission` block, so a restricted agent stays restricted after migration. The two systems name their tools differently and a few names cover more ground in opencode than in Tabnine CLI, so the wizard shows you the resulting permissions and flags any tool that gains access it did not have before.
+
+MCP server timeouts are written explicitly. Tabnine CLI allows an MCP request 10 minutes by default and opencode allows 5 seconds, so the wizard records the original 10-minute value instead of letting a migrated server inherit a much shorter one.
 
 ## What does NOT get migrated
 
@@ -95,7 +103,16 @@ Or ask opencode in natural language:
 migrate my tabnine cli config to opencode
 ```
 
-Either entry point activates the same skill. The wizard scans for Tabnine CLI configuration, prints a compact inventory, and then asks you category by category (MCP servers, skills, subagents, commands, extensions) which items to migrate and where to write them.
+Either entry point activates the same skill. The wizard runs in four steps:
+
+1. **Discover** — scans for Tabnine CLI configuration and prints an inventory of what it found.
+2. **Ask** — one question per category: target scope, MCP servers, skills, subagents, commands, and extensions.
+3. **Plan** — shows exactly what it intends to do before doing any of it: the target directory, every file it will create, overwrite, or back up, the MCP servers it will connect, and any change to an agent's permissions. Nothing has been written yet, and it waits for your approval.
+4. **Write** — carries out the approved plan, then reports what was written and anything that differed from the plan.
+
+Selecting categories in step 2 does not authorize any write; only your approval in step 3 does. To preview a migration without performing one, ask for the plan and stop there.
+
+Credentials are handled carefully throughout. The wizard prints the names of environment variables and request headers but never their values, and if an MCP server has a password or token written directly into its configuration, it offers to replace it with an `{env:VAR}` reference rather than copying the secret into `opencode.json`.
 
 To migrate your `TABNINE.md` context files into `AGENTS.md`, run `/migrate-context` (or ask "migrate my tabnine context files"). That skill is scoped per repository — re-run it in each project whose context files you want to bring over.
 
@@ -114,6 +131,16 @@ For a project install, replace `~/.config/opencode` with `.opencode`. Restart op
 
 The most common issue is forgetting to restart. opencode loads skills and commands at startup. If `/migrate` is not recognized or the wizard behaviour is stale, quit opencode fully and start it again.
 
+To confirm that opencode picked up a migration, ask the wizard to check it for you, or inspect the loaded configuration directly. These commands list the active config directory, every skill opencode has loaded with the file it came from, and the available agents:
+
+```bash
+opencode debug paths
+opencode debug skill
+opencode agent list
+```
+
+Each command reads the configuration from disk, so it reflects a migration immediately. If a migrated item appears here but an open session still behaves as it did before, restart that session.
+
 If opencode fails to start after the migration with a `ConfigInvalidError`, one of the migrated fields has been rejected. If you migrated into a project (`.opencode/`), start opencode with project config disabled so you can fix it:
 
 ```bash
@@ -124,7 +151,15 @@ This does not bypass the global `~/.config/opencode/` config — for a global in
 
 A `duplicate skill name` warning (written to opencode's log, not shown in the UI) means two skills share the same `name` field under paths opencode scans (`~/.config/opencode/skills/`, `~/.claude/skills/`, `~/.agents/skills/`, the directory named by `OPENCODE_CONFIG_DIR` if it is set, and the equivalent workspace paths). opencode keeps the last copy it scans and silently shadows the other, so remove or rename one of them. The log line names both paths.
 
-If your launcher sets `OPENCODE_CONFIG_DIR` (the Tabnine opencode wrapper points it at `~/.tabnine/opencode/config`), note that it *adds* a config root rather than replacing the default one. `opencode debug paths` still reports `~/.config/opencode` as the config root, and skills, agents, and `opencode.json` are loaded from both directories. Installing into `~/.config/opencode/` works either way; just don't install the same items into both roots.
+If your launcher sets `OPENCODE_CONFIG_DIR`, as the Tabnine opencode wrapper does, that directory is read in addition to `~/.config/opencode` rather than instead of it. opencode loads skills, agents, and `opencode.json` from both. Installing into `~/.config/opencode` therefore works either way, but avoid installing the same item into both directories, since one copy will shadow the other.
+
+## Reference documents
+
+Inside `skills/migrate-from-tabnine-cli/references/`:
+
+- `mapping.md` — the field-by-field translation tables, including the agent tool-name map and the MCP field rules. Consult this when checking or hand-fixing a migrated value.
+- `source-map.md` — every Tabnine CLI configuration path, and which one takes precedence when the same setting appears in more than one.
+- `verification-and-recovery.md` — the post-migration verification commands and the recovery steps for a failed or partial migration.
 
 ## License
 
