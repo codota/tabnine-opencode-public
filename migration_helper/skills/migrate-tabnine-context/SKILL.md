@@ -24,7 +24,9 @@ You are migrating the user's Tabnine CLI context/memory files into opencode's `A
    - **Project**: `<cwd>/<name>` for each configured name, plus subdirectory matches (`**/<name>`, skipping `node_modules`, `.git`, and other vendored dirs). Tabnine reads these hierarchically; opencode reads `AGENTS.md` per directory, so subdirectory files map to a sibling `AGENTS.md` in the same directory.
    - **Global**: `~/.tabnine/agent/TABNINE.md` (or the Gemini equivalent). Target: `~/.config/opencode/AGENTS.md`. Offer this only if it hasn't been migrated already — if the target exists and already contains the source content, report "already migrated" and skip.
 
-   The global target is always `~/.config/opencode/AGENTS.md`, even when `OPENCODE_CONFIG_DIR` is set. opencode resolves the global instruction file from its config root only, so unlike skills and agents — which are loaded from both directories — an `AGENTS.md` written into an `OPENCODE_CONFIG_DIR` such as `~/.tabnine/opencode/config` is never read. Never write it there.
+   The global target is always `~/.config/opencode/AGENTS.md`, even when `OPENCODE_CONFIG_DIR` is set. opencode resolves the global instruction file from its config root only, so unlike skills and agents — which load from both directories — an `AGENTS.md` inside an `OPENCODE_CONFIG_DIR` such as `~/.tabnine/opencode/config` is never read. Never write one there.
+
+   Check for that mistake while discovering. If `OPENCODE_CONFIG_DIR` is set and an `AGENTS.md` already exists inside it, report it as present but never loaded, and offer to move its content to `~/.config/opencode/AGENTS.md` — as a merge, through the normal plan and backup flow. It is the one case where this skill's source is an opencode file rather than a Tabnine one, so state plainly where the content came from and leave the original in place unless the user asks otherwise.
 3. If a configured name is already `AGENTS.md`, opencode reads it natively — report it as "no migration needed".
 
 Print what was found (path, size, target) and ask which files to migrate. If nothing was found, say so and stop.

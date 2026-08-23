@@ -23,7 +23,7 @@ Discover the user's Tabnine CLI (or Gemini CLI) configuration on disk, ask exact
 
 ## Phase 1 — Discover
 
-Before asking anything, scan the source locations and build an inventory. Report the counts back to the user before the first question.
+Scan the source locations and report the counts before asking anything.
 
 Check each of these, all optional, under `~/.tabnine/agent/` (user) and `<cwd>/.tabnine/agent/` (workspace):
 
@@ -66,7 +66,7 @@ Use the `question` tool. Order:
 
 1. **Target scope for this session** — global (`~/.config/opencode/`) or project (`./.opencode/` in the current worktree). Ask once at the start of the session. If the user later says something like "put this one in the project instead", re-scope only that category and keep the session default for the rest.
 
-   If `OPENCODE_CONFIG_DIR` is set, do not assume it redirects the global root — see Gotchas. Either root is a valid target; pick one.
+   If `OPENCODE_CONFIG_DIR` is set, it does not redirect the global root — see Gotchas before choosing.
 
 2. **MCP servers** — multi-select from the discovered list. Flag any name that already exists as `mcp.<name>` in the target `opencode.json`.
 3. **Skills** — multi-select. Flag any target-folder collision.
@@ -191,7 +191,7 @@ Never migrate `tabnine-extension.json` as a unit. Apply the rules above to each 
 After all writes succeed, reconcile against the Phase 2.5 plan and print a summary. Name any write that was **not** in the plan, and any planned write that did not happen — a partial failure mid-phase is exactly when the user needs a manifest rather than a glob.
 
 - What was written (grouped by category, with target paths), including the `opencode.json.bak-*` backup path if one was made.
-- Anything **skipped** (collision or opt-out) and any name or invocation that changed (`/foo:bar` → `/foo/bar`).
+- Anything skipped, and any name or invocation that changed (`/foo:bar` → `/foo/bar`).
 - Agents with dropped `mcp_servers`, `timeout_mins`, or `model`. For a dropped `model`, point at `opencode models` so the user can set a `provider/model-id` themselves.
 - For every agent that had a `tools` allowlist: the `permission` block you produced, any Tabnine tool name that had no opencode equivalent, and any place the mapping widened privilege (notably `replace` → `edit`, which adds write access). This is a security-relevant diff — never summarize it as "migrated".
 - Any MCP server where you wrote an explicit `timeout` because the source relied on Tabnine's 10-minute default.
@@ -205,7 +205,8 @@ After all writes succeed, reconcile against the Phase 2.5 plan and print a summa
 
 Environment facts that defy reasonable assumptions. Read before Phase 1.
 
-- **`OPENCODE_CONFIG_DIR` adds a config root, it does not move one.** Verified with `opencode debug paths`, `debug skill`, `agent list`, and `debug config` against a scratch dir: the reported `config` root stays `~/.config/opencode`, and skills, agents, and `opencode.json` are loaded from *both* that directory and the override. The Tabnine opencode wrapper sets it to `~/.tabnine/opencode/config`. Either is a valid target; installing the same `name` into both shadows one silently.
+- **`OPENCODE_CONFIG_DIR` adds a config root, it does not move one.** The reported `config` root stays `~/.config/opencode`, and skills, agents, and `opencode.json` load from *both* it and the override (the Tabnine wrapper sets the override to `~/.tabnine/opencode/config`). Either is a valid target, but installing the same `name` into both shadows one silently.
+- **`AGENTS.md` is the exception: it loads from the config root only.** So if the user targets the override root, their skills and agents work there but a global `AGENTS.md` written alongside them is never read — it belongs at `~/.config/opencode/AGENTS.md` regardless of target scope. Say so when the user picks the override root, since `/migrate-context` will not be able to follow their choice.
 - **opencode's MCP env key is `environment`.** An `env` key is accepted by the schema and then ignored, so the server starts with none of its variables and fails in a way that looks unrelated.
 - **MCP timeout defaults differ 120-fold.** Tabnine 600000 ms, opencode 5000 ms.
 - **Duplicate `name` is silent.** opencode logs `duplicate skill name` to the log only; the last copy scanned wins and the other never runs.
