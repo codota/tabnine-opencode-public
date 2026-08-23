@@ -114,7 +114,7 @@ Selecting categories in step 2 does not authorize any write; only your approval 
 
 Credentials are handled carefully throughout. The wizard prints the names of environment variables and request headers but never their values, and if an MCP server has a password or token written directly into its configuration, it offers to replace it with an `{env:VAR}` reference rather than copying the secret into `opencode.json`.
 
-To migrate your `TABNINE.md` context files into `AGENTS.md`, run `/migrate-context` (or ask "migrate my tabnine context files"). That skill is scoped per repository — re-run it in each project whose context files you want to bring over.
+To migrate your `TABNINE.md` context files into `AGENTS.md`, run `/migrate-context` (or ask "migrate my tabnine context files"). That skill is scoped per repository, so re-run it in each project whose context files you want to bring over. It follows the same plan-then-approve flow, and because a merge appends to an `AGENTS.md` you already rely on, it backs up the existing file first.
 
 ## Uninstall
 
