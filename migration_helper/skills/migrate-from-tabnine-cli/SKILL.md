@@ -5,13 +5,13 @@ description: Wizard that migrates Tabnine CLI (a Gemini CLI fork) configuration 
 
 # Migrate from Tabnine CLI to opencode
 
-You are running an interactive migration wizard. The user has Tabnine CLI (or Gemini CLI) configuration on disk and wants it available in opencode. Your job is to discover what they have, ask exactly what to move where, translate incompatible fields, and install the results without breaking opencode's strict config validation.
+Discover the user's Tabnine CLI (or Gemini CLI) configuration on disk, ask exactly what to move where, translate incompatible fields, and install the results without tripping opencode's config validation. This is an interactive wizard: it asks per category and it writes only what the user approved.
 
 ## Core rules
 
 1. **Never migrate blindly.** Always list what you found and ask the user to pick, per category, before writing anything.
 2. **Never invent MCP servers, skills, or agents that aren't on disk.** Only migrate what discovery actually finds.
-3. **Never overwrite an existing opencode file without asking.** If a target file already exists, offer skip / overwrite / rename.
+3. **Never overwrite an existing opencode file without asking.** If a target file already exists, offer skip / overwrite / rename — and on overwrite, copy the existing file to `<path>.bak-<YYYYMMDD-HHMMSS>` first. This applies to skills, agents, and commands exactly as it does to `opencode.json`; an overwrite with no backup is unrecoverable.
 4. **Never touch the source files.** This is a copy-and-translate flow, not a move. The user should be able to keep using Tabnine CLI after.
 5. **Validate translations against opencode's schema before writing.** If unsure about a field's shape, fetch `https://opencode.ai/config.json`; the built-in `customize-opencode` skill (bundled with opencode) is a faster shortcut when available.
 6. **Remind the user to restart opencode at the end.** opencode does not hot-reload config.
@@ -25,32 +25,28 @@ You are running an interactive migration wizard. The user has Tabnine CLI (or Ge
 
 Before asking anything, scan the source locations and build an inventory. Report the counts back to the user before the first question.
 
-Source locations to check (in this order, all optional):
+Check each of these, all optional, under `~/.tabnine/agent/` (user) and `<cwd>/.tabnine/agent/` (workspace):
 
-| Source | Path |
-| --- | --- |
-| User settings (MCPs live here) | `~/.tabnine/agent/settings.json` — read the `mcpServers` object |
-| Per-server enablement | `~/.tabnine/agent/mcp-server-enablement.json` — `{ name: { enabled: false } }` means user disabled it |
-| User skills | `~/.tabnine/agent/skills/*/SKILL.md` |
-| User agents/subagents | `~/.tabnine/agent/agents/*.md` |
-| User slash commands | `~/.tabnine/agent/commands/**/*.toml` |
-| User extensions | `~/.tabnine/agent/extensions/*/tabnine-extension.json` (may bundle MCPs, skills, agents, commands) |
-| Agent-alias skills | `~/.agents/skills/*/SKILL.md` |
-| Workspace equivalents | `<cwd>/.tabnine/agent/{skills,agents,commands,extensions}/…`, `<cwd>/.agents/skills/…` |
-| Legacy Gemini paths (if the user hasn't switched to Tabnine mode) | Same layout under `.gemini/` and `~/.gemini/` |
-| Legacy Claude Code skills | `~/.claude/skills/*/SKILL.md` (opencode already auto-scans this location — see note in Phase 4) |
+- `settings.json` → the `mcpServers` object. `mcp-server-enablement.json` → `{ name: { enabled: false } }` marks a server disabled.
+- `skills/*/SKILL.md`, `agents/*.md`, `commands/**/*.toml`, `extensions/*/tabnine-extension.json` (an extension may bundle any of the others).
+- Also `~/.agents/skills/*/SKILL.md` and `<cwd>/.agents/skills/…`.
+- If the user is on plain Gemini CLI, the same layout lives under `.gemini/` and `~/.gemini/`.
+- `~/.claude/skills/*/SKILL.md` — opencode already scans this; see Gotchas.
+
+`references/source-map.md` has the exhaustive path list and the precedence rules.
 
 Use the Read/Glob tools to check each path. If a path doesn't exist, silently skip it — don't error.
 
-For each SKILL.md and each agent `.md`, read only the frontmatter (top of file up to the second `---`) to get `name` and `description`. Don't slurp full bodies during discovery. Exception: if an agent file's frontmatter parses as a YAML **array**, it's a remote-agent (A2A) bundle — record the whole file as "remote agents: skipped (no opencode equivalent)" and don't look for `name`/`description` in it.
+Read only the frontmatter of each SKILL.md and agent `.md` (up to the second `---`) for `name` and `description`; never slurp full bodies during discovery. If an agent's frontmatter parses as a YAML **array** it is a remote-agent (A2A) bundle: record it as "remote agent: skipped (no opencode equivalent)" and read no further.
 
-If discovery also notices Tabnine context files (`TABNINE.md` in the project or `~/.tabnine/agent/`), don't inventory them here — mention once that the separate `/migrate-context` command handles those.
+Note but do not inventory Tabnine context files (`TABNINE.md`) — say once that `/migrate-context` handles them.
 
 After discovery, print a compact inventory like:
 
 ```
 Found in ~/.tabnine/agent:
-  MCPs (3):     github-mcp [enabled], playwright [disabled], tabnine-context (built-in, skipped)
+  MCPs (2):     github-mcp [enabled], playwright [disabled]
+                (tabnine-context, tabnine-coaching: built-in, not migratable)
   Skills (2):   release-notes, code-review-checklist
   Agents (1):   issue-triager
   Commands (0)
@@ -62,9 +58,7 @@ Found in ~/.agents/skills:
 Found in <cwd>/.tabnine/agent: (nothing)
 ```
 
-Show the built-in `tabnine-context` / `tabnine-coaching` servers greyed-out as `(built-in, skipped)` — never as selectable items — so the user isn't confused when they don't appear in the multi-select.
-
-Then ask what the user wants to migrate — one category at a time.
+Never list the built-in `tabnine-context` / `tabnine-coaching` servers as selectable, and keep them out of the headline count, so the multi-select matches what the inventory promised.
 
 ## Phase 2 — Ask per category
 
@@ -72,18 +66,56 @@ Use the `question` tool. Order:
 
 1. **Target scope for this session** — global (`~/.config/opencode/`) or project (`./.opencode/` in the current worktree). Ask once at the start of the session. If the user later says something like "put this one in the project instead", re-scope only that category and keep the session default for the rest.
 
-   Do not let `OPENCODE_CONFIG_DIR` confuse this choice. Some distributions set it (the Tabnine opencode wrapper points it at `~/.tabnine/opencode/config`), which looks like it redirects the global root. It does not. Verified by pointing the variable at a scratch dir and running `opencode debug paths`, `debug skill`, `agent list`, and `debug config`: the reported `config` path stays `~/.config/opencode`, and that directory's `skills/`, `agents/`, and `opencode.json` are still loaded. The override **adds a second root** — skills, agents, and `opencode.json` inside it are also scanned and merged. So `~/.config/opencode/` is always a valid global target. If the user would rather keep a vendor-managed install self-contained and target the override dir instead, that works too. Install into exactly one of the two: the same `name` present in both roots is a duplicate. On a duplicate, opencode logs `duplicate skill name` (to the log only, never the UI) and the last scanned copy wins, so the outcome is deterministic but depends on scan order — and which of these two roots is scanned last is not something this skill has verified. Do not rely on it.
-2. **MCP servers** — multi-select from the discovered list. Warn on any name conflict with an existing `mcp.<name>` in the target `opencode.json`.
-3. **Skills** — multi-select. Warn on any target-folder collision.
-4. **Agents** — multi-select. For each selected agent, ask a follow-up: `subagent` (default) or `primary` mode, using exactly this explanation: "primary agents are user-facing entry points the user can switch to and chat with directly; subagents are only invoked by another agent as a delegated task." (opencode also has `mode: all` — don't offer it; suggest it only if the user asks for both behaviors.)
+   If `OPENCODE_CONFIG_DIR` is set, do not assume it redirects the global root — see Gotchas. Either root is a valid target; pick one.
+
+2. **MCP servers** — multi-select from the discovered list. Flag any name that already exists as `mcp.<name>` in the target `opencode.json`.
+3. **Skills** — multi-select. Flag any target-folder collision.
+4. **Agents** — multi-select. Per agent, ask `subagent` (default) or `primary`, explaining it exactly as: "primary agents are user-facing entry points the user can switch to and chat with directly; subagents are only invoked by another agent as a delegated task." Do not offer `mode: all` unless the user asks for both behaviors.
 5. **Commands** — multi-select if any were found.
 6. **Extensions** — for each **enabled** extension found (skip ones disabled in `extension-enablement.json`), list what it bundles (MCPs / skills / agents / commands) and ask whether to unpack each component into the target. Do not migrate the extension manifest itself; opencode has no equivalent.
 
-Never present a "migrate all" shortcut without also showing the individual list. After printing the inventory, the very next message must be the target-scope question followed by the MCP multi-select — not a yes/no "shall I migrate everything?" confirmation. The user asked for a wizard — respect that.
+Never offer a "migrate all" shortcut without also showing the individual list. The message after the inventory must be the target-scope question followed by the MCP multi-select — not a yes/no "shall I migrate everything?" prompt.
+
+## Phase 2.5 — Write plan (required before any write)
+
+This wizard is an installer: it wires MCP endpoints, agent prompts, and slash commands into the user's agent. Treat it as a supply-chain boundary, not setup glue. Write nothing until the user has approved a plan.
+
+Resolve every selected item to a concrete destination, print the plan, and stop:
+
+```
+Mode: plan (nothing written yet)
+Target root: /Users/me/.config/opencode   (OPENCODE_CONFIG_DIR is set elsewhere; not the target)
+
+MCP endpoints granted to your agent:
+  github-mcp   local    npx -y @modelcontextprotocol/server-github
+  acme-api     remote   https://mcp.acme.example/v1   [headers: Authorization]
+
+Writes planned:
+  create     <root>/opencode.json              (mcp.github-mcp, mcp.acme-api)
+  backup     <root>/opencode.json.bak-20260823-181500
+  create     <root>/skills/release-notes/      (2 files)
+  overwrite  <root>/agents/triager.md          (backup .bak-20260823-181500)
+  create     <root>/command/deploy.md          (from commands/deploy.toml)
+
+Permission changes:
+  triager: tools [read_file, replace] -> {*: deny, read: allow, edit: allow}
+           NOTE: edit widens privilege (adds write)
+
+Nothing outside this list will be touched.
+```
+
+Rules for the plan:
+
+- Absolute resolved paths, never `<target>` placeholders. Path validation (rule 9) runs before the plan prints, so a rejected name never reaches it.
+- Show MCP endpoints: each is a new outbound destination the agent may reach. Header and environment **key names only**, never values (rule 10).
+- Give every planned backup its own line.
+- Resolve each collision flagged in Phase 2 here, not earlier: per colliding item ask skip / overwrite / rename (core rule 3), then show the chosen verb in the plan. `opencode.json` is the one exception — it is always backed up and merged, never replaced, so it needs no question.
+- Then ask for explicit approval to proceed. A category selection in Phase 2 is not approval to write. If the user declines, stop — the plan alone is a useful artifact.
+- If the user asks for a dry run, this phase *is* the dry run: print the plan and stop without asking.
 
 ## Phase 3 — Translate and write
 
-Per opencode's schema (see `references/mapping.md` next to this SKILL.md for the full field-by-field table). Highlights:
+Per category:
 
 ### MCP servers
 
@@ -91,27 +123,26 @@ Tabnine stores `mcpServers: { name: { url?, httpUrl?, command?, args?, env?, cwd
 
 Translate to opencode `mcp: { name: { type, url|command, headers?, environment?, cwd?, timeout?, enabled } }`:
 
-- If the source has a `url` or `httpUrl` field → `type: "remote"`, `url: <that value>`.
-- If the source has a `command` field → `type: "local"`, `command: [<command>, ...args]` (opencode requires an array).
+- `url` or `httpUrl` → `type: "remote"` + `url`. `command` → `type: "local"` + `command: [cmd, ...args]` (opencode requires an array).
 - Rename `env` → `environment` — **opencode's key is `environment`; an `env` key is silently ignored and the server starts without its variables.** Preserve `headers` and `cwd` under their own names.
-- `timeout`: both sides are milliseconds, but the **defaults differ by two orders of magnitude** — Tabnine defaults to 600000 (10 minutes, `MCP_DEFAULT_TIMEOUT_MSEC`), opencode to 5000 (5 seconds). Copy an explicit value as-is. When the source omits `timeout`, write `timeout: 600000` explicitly rather than omitting it, or the server silently drops to a 5-second budget and any slow server looks broken after migration. Say this in the summary.
-- Rewrite `$VAR` / `${VAR}` placeholders inside values to opencode's `{env:VAR}` syntax — unconditionally, wherever they appear, including inside larger strings (`"Bearer $TOKEN"` → `"Bearer {env:TOKEN}"`) and in `headers` as much as `environment` (see `references/mapping.md`).
-- Set `enabled: false` if the enablement file marks this server disabled; otherwise `enabled: true` (opencode's default). Ignore enablement entries with no matching server.
-- Never copy `mcp-oauth-tokens.json`. OAuth tokens will not carry over; the user will re-authenticate on first use. Tell them this after writing.
+- `timeout`: milliseconds on both sides, but the **defaults differ 120-fold** (Tabnine 600000, opencode 5000). Copy an explicit value as-is; when the source omits it, write `timeout: 600000` rather than omitting it, or slow servers silently break. Note it in the summary.
+- Rewrite `$VAR` / `${VAR}` to `{env:VAR}` everywhere it appears, including mid-string (`"Bearer $TOKEN"` → `"Bearer {env:TOKEN}"`) and in `headers` as much as `environment`.
+- `enabled: false` if the enablement file disables it, else `enabled: true`. Ignore enablement entries with no matching server.
+- Never copy `mcp-oauth-tokens.json`. Tokens do not carry over; the user re-authenticates on first use.
 
-If the target `opencode.json` exists, copy it to `opencode.json.bak-<YYYYMMDD-HHMMSS>` first, then merge into its `mcp` object rather than replacing it. Preserve `$schema`, `plugin`, and any other keys already present. If the file doesn't exist, create it with `"$schema": "https://opencode.ai/config.json"` (no backup needed).
+If the target `opencode.json` exists: back it up to `opencode.json.bak-<YYYYMMDD-HHMMSS>`, then merge into its `mcp` object rather than replacing it, preserving `$schema`, `plugin`, and every other existing key. If it does not exist, create it with `"$schema": "https://opencode.ai/config.json"` — no backup needed, and say so in the summary so the recovery advice matches reality.
 
 ### Skills
 
-Copy the entire skill folder (SKILL.md and all sibling files) to `<target>/skills/<name>/`. Frontmatter is compatible verbatim — both systems require `name` and `description`. Do not edit the SKILL.md, with one exception below.
+Copy the entire skill folder (SKILL.md and all sibling files) to `<target>/skills/<name>/`. Frontmatter is compatible verbatim — both systems require `name` and `description`. Do not edit the SKILL.md except in the two cases below.
 
-Frontmatter sanity check (advisory, never silent): after copying, try parsing the frontmatter as strict YAML. The common defect is an unquoted `description` containing a colon-space, e.g. `description: reduces mistakes: think before coding`, which strict YAML rejects as a nested mapping. Current opencode builds parse it anyway, so the skill still loads — do not present this as breakage. Report it as "loads today, but one parser change from breaking" and offer to wrap the value in double quotes (escaping any inner quotes). Only edit with the user's approval; the source file has the same defect, so leaving it is a legitimate choice.
+**Exception 1 — frontmatter sanity check (advisory).** Try parsing the copied frontmatter as strict YAML. The usual defect is an unquoted `description` containing a colon-space (`description: fewer mistakes: think first`), which strict YAML reads as a nested mapping. Current opencode builds parse it anyway, so do not call it breakage: report it as "loads today, one parser change from breaking" and offer to quote the value. The source has the same defect, so declining is reasonable.
 
-Name normalization (the exception): opencode's documented name format is `^[a-z0-9]+(-[a-z0-9]+)*$` (lowercase, hyphen-separated). Tabnine allows underscores, uppercase, and spaces in skill and agent names. Current opencode builds load nonconforming names anyway, but they're outside the documented contract and may break in a future version. If a selected skill or agent has a nonconforming `name`, offer to normalize it (lowercase, `_` and spaces → `-`) in both the `name` field and the target folder/file name — with the user's confirmation, never silently.
+**Exception 2 — name normalization.** opencode documents `^[a-z0-9]+(-[a-z0-9]+)*$`; Tabnine allows underscores, capitals, and spaces, and current opencode builds load those anyway. On a nonconforming `name`, offer to normalize it (lowercase, `_` and spaces → `-`) in both the `name` field and the folder name. Never silently. Path validation (core rule 9) runs first.
 
-After copying each selected skill, grep its body (and sibling files) for Gemini-specific references. Do **not** rewrite anything — rewriting prompts changes semantics. Sort hits into two buckets, because they need different follow-up:
+Grep each copied skill (body and siblings) for Gemini-specific references. Never rewrite them — that changes prompt semantics. Sort hits into two buckets:
 
-**Broken invocations** — a command the skill tells the agent to run that won't exist under opencode. Match the CLI actually being invoked, not the bare word:
+**Broken invocations** — a command the skill tells the agent to run that will not exist under opencode. Match the CLI as invoked, not the bare word:
 
 ```
 (^|[`$(\s])gemini\s+(-p|--prompt|-y|--yolo|chat|mcp|extensions)\b
@@ -119,51 +150,27 @@ After copying each selected skill, grep its body (and sibling files) for Gemini-
 \btui-tester\b
 ```
 
-**Path and filename mentions** — `GEMINI.md`, `.gemini/`, `~/.gemini`. These are usually deliberate prose (a docs skill legitimately discusses upstream paths), so report them as "mentions to review", never as defects.
+**Path and filename mentions** — `GEMINI.md`, `.gemini/`, `~/.gemini`. Usually deliberate prose (a docs skill may legitimately discuss upstream paths), so report these as "mentions to review", never as defects.
 
-A bare `gemini ` substring match is too loose — it fires on ordinary sentences like "reconcile the upstream Gemini CLI release" and produces false alarms. Report both buckets in the Phase 4 summary, one line each, labelled distinctly.
+Do not match a bare `gemini ` substring: it fires on ordinary sentences like "reconcile the upstream Gemini CLI release". Report the two buckets separately in the summary.
 
 ### Agents
 
 Read the source `.md`, split frontmatter from body, translate frontmatter, keep body verbatim.
 
-Field mapping (drop anything not listed):
+**Read `references/mapping.md` before writing your first agent** — it holds the full field table, the tool name map, and the A2A case. Summary of the frontmatter translation:
 
-| Tabnine frontmatter | opencode frontmatter | Notes |
-| --- | --- | --- |
-| `name` | `name` | Keep. |
-| `description` | `description` | Keep. |
-| `display_name` | — | Drop. opencode has no equivalent. |
-| `model` | `model` | Keep only if it's already `provider/model-id`. Values like `inherit`, `claude-4-opus`, `Claude 4.8 Opus` must be dropped (subagents inherit by default; primaries fall back to global `model`). |
-| `temperature` | `temperature` | Keep. |
-| `max_turns` | `steps` | Rename. Keep integer value. |
-| `timeout_mins` | — | Drop. opencode has no per-agent timeout. Mention this to the user for that agent. |
-| `tools` | `permission` | **Translate — never drop.** Tabnine's `tools` is a YAML list of allowed tool names, so dropping it silently grants the migrated agent every tool, including `bash`, `write`, and `edit`. That is a privilege escalation introduced by the migration. Tool names differ between the two systems; see the name map in `references/mapping.md` and deny-by-default. |
-| `mcp_servers` | — | Drop. opencode agents cannot declare private MCPs. Offer to move the definitions into top-level `mcp` in `opencode.json`. |
-| — | `mode` | Add. Use the value the user chose in Phase 2 (`subagent` or `primary`). |
+- Rename `max_turns` → `steps`. Add `mode` (the value chosen in Phase 2).
+- Translate `tools` into a deny-by-default `permission` block, using the tool name map in `references/mapping.md`. Never drop it: Tabnine's `tools` is an allowlist, so dropping it grants `bash`, `write`, and `edit` to an agent that was denied them.
+- Keep `name`, `description`, `temperature`. Keep `model` only if already `provider/model-id`; drop `inherit` and bare model names.
+- Drop `display_name`, `timeout_mins`, `kind`. Drop `mcp_servers` from the agent, offering to hoist the definitions into top-level `mcp`.
+- Drop anything else. opencode passes unrecognized frontmatter keys through to the model provider as request options, so a leftover Tabnine key is not inert — it can reach the provider API and be rejected there.
 
 Write to `<target>/agents/<name>.md`. opencode's loader globs `{agent,agents}/**/*.md`, so both spellings are loaded and neither is more correct than the other. Prefer the plural `agents/`: it's the form the agents documentation uses in every example and the form `opencode agent create` writes, so a user who later cross-checks the docs won't find a mismatch. If the target already has a singular `agent/` folder, write there instead and leave it alone — do not consolidate or move existing files to match this preference.
 
 ### Commands
 
-Tabnine command TOMLs look like:
-
-```toml
-description = "..."
-prompt = """
-Multi-line prompt with {{args}} or $ARGUMENTS references
-"""
-```
-
-Translate to opencode markdown:
-
-```markdown
----
-description: "…"
----
-
-<body: the prompt content, verbatim>
-```
+A Tabnine command is a TOML file with `description` and a `prompt` string; the opencode equivalent is markdown with a `description` frontmatter key and the prompt as the body, verbatim. `references/mapping.md` has a worked before/after example.
 
 Rewrite all three Tabnine placeholder syntaxes in the prompt body — not just `{{args}}`:
 
@@ -173,58 +180,45 @@ Rewrite all three Tabnine placeholder syntaxes in the prompt body — not just `
 
 Leave `$ARGUMENTS`, `$1`, `$2` alone if already present. If the prompt has no placeholder at all, copy it as-is — both systems auto-append the user's arguments; do not insert `$ARGUMENTS`.
 
-Write to `<target>/command/<name>.md`, mirroring nested source folders: `commands/foo/bar.toml` → `<target>/command/foo/bar.md`. The invocation changes from Tabnine's `/foo:bar` to opencode's `/foo/bar` — mention this in the summary.
+Write to `<target>/command/<name>.md`, mirroring nested source folders: `commands/foo/bar.toml` → `<target>/command/foo/bar.md`. opencode's loader globs `{command,commands}/**/*.md`, so either spelling loads; if the target already has a `commands/` folder, write there and leave it alone. The invocation changes from Tabnine's `/foo:bar` to opencode's `/foo/bar` — mention this in the summary.
 
 ### Extensions
 
-Do not migrate `tabnine-extension.json` as a unit. For each component the user opted into, apply the rules above to the extension's `mcpServers`, `skills/`, `agents/`, `commands/` entries. Prepend the extension name to the migrated item's `name` field if a collision exists (`<ext>-<original-name>`), and mention this to the user.
+Never migrate `tabnine-extension.json` as a unit. Apply the rules above to each opted-in component of the extension (`mcpServers`, `skills/`, `agents/`, `commands/`). On a name collision, prefix the extension name (`<ext>-<original-name>`) and say so.
 
 ## Phase 4 — Post-write summary and warnings
 
-After all writes succeed, print a summary:
+After all writes succeed, reconcile against the Phase 2.5 plan and print a summary. Name any write that was **not** in the plan, and any planned write that did not happen — a partial failure mid-phase is exactly when the user needs a manifest rather than a glob.
 
 - What was written (grouped by category, with target paths), including the `opencode.json.bak-*` backup path if one was made.
-- Any items that were **skipped** due to collisions or user opt-out, and any names or invocations that changed (normalized names, `/foo:bar` → `/foo/bar`).
-- Any agents where `mcp_servers`, `timeout_mins`, or `model` fields were dropped, with a one-liner suggesting where the user should look next. For a dropped `model`, point at `opencode models` / the provider list so the user can set a `provider/model-id` value themselves.
+- Anything **skipped** (collision or opt-out) and any name or invocation that changed (`/foo:bar` → `/foo/bar`).
+- Agents with dropped `mcp_servers`, `timeout_mins`, or `model`. For a dropped `model`, point at `opencode models` so the user can set a `provider/model-id` themselves.
 - For every agent that had a `tools` allowlist: the `permission` block you produced, any Tabnine tool name that had no opencode equivalent, and any place the mapping widened privilege (notably `replace` → `edit`, which adds write access). This is a security-relevant diff — never summarize it as "migrated".
 - Any MCP server where you wrote an explicit `timeout` because the source relied on Tabnine's 10-minute default.
-- Any skills whose bodies reference Gemini-specific tools, flagged for manual review.
-- OAuth reminder for any migrated remote MCP servers (Atlassian, Mixpanel, GitHub, etc.): tokens do not carry over.
+- Skills whose bodies reference Gemini-specific tooling, flagged for review.
+- OAuth reminder for migrated remote MCP servers: tokens do not carry over.
 - If Tabnine context files exist (`TABNINE.md` in the project or `~/.tabnine/agent/`): "Your TABNINE.md context files weren't part of this migration — run `/migrate-context` to move them into AGENTS.md."
 - **Restart reminder**: "Quit and restart opencode for these changes to take effect. Running sessions keep using the already-loaded config."
-- **Offer** the optional verification in Phase 5 below — one line, e.g. "I can verify these actually load after you restart — say the word." Do not run it uninvited.
+- **Offer** the optional verification (see `references/verification-and-recovery.md`) — one line, e.g. "I can verify these actually load after you restart — say the word." Do not run it uninvited.
 
-## Phase 5 — Verification (optional, only if the user asks)
+## Gotchas
 
-Skip this entirely unless the user asks for it. It requires a restart to be meaningful: the commands read config from disk, so running them before the user restarts still reflects the new files, but the user's *running* session does not.
+Environment facts that defy reasonable assumptions. Read before Phase 1.
 
-Three commands settle whether opencode actually loaded the migration. Run them from the project directory, and export `OPENCODE_CONFIG_DIR` first if the user's launcher sets it, so you reproduce their real environment:
-
-```
-opencode debug paths    # confirms which directory is the global config root
-opencode debug skill    # JSON: every loaded skill with its resolved location
-opencode agent list     # loaded agents and their mode
-opencode debug agent <name>   # one agent's resolved mode, steps, model, prompt
-```
-
-Check that each migrated skill appears with a `location` under the target you wrote to, that its `description` and `content` are non-empty (proves the frontmatter parsed), and that each migrated agent is listed with the mode the user chose. `debug agent` additionally confirms `steps` survived the `max_turns` rename and that no stale `model` is pinned.
-
-Worth verifying on disk at the same time, since neither command covers it: the migrated skill folders are byte-identical to their Tabnine sources, relative `references/…` links inside the bodies resolve, and no skill `name` is duplicated across the scanned roots.
-
-Report failures as findings and ask before changing anything — Phase 4 already ended the write window (core rule 7).
-
-Note about Claude Code skills at `~/.claude/skills`: opencode auto-scans this path already. Do NOT copy skills from there into `~/.config/opencode/skills/` unless the user explicitly asks — you'd end up with two copies of the same name. opencode logs `duplicate skill name` with both locations and the last scanned copy wins, so the loser is silently shadowed with no visible error. If discovery finds Claude Code skills, tell the user they're already visible to opencode and skip them by default.
-
-## When things go wrong
-
-- **`ConfigInvalidError` on startup after migration**: the user's `opencode.json` has a rejected field. Recover with `OPENCODE_DISABLE_PROJECT_CONFIG=1 opencode` (project) or by manually editing the global file. Point them at the escape hatches in the `customize-opencode` skill.
-- **A migrated skill behaves inconsistently or seems to "flip" between versions**: two skills with the same `name` exist in scanned paths. opencode logs `duplicate skill name` with both locations and keeps the last one scanned; the earlier copy is shadowed silently. Check the log for the two paths, then rename or delete one.
-- **`ConfigInvalidError` after the MCP merge specifically**: restore the `opencode.json.bak-<timestamp>` backup written before the merge, then retry.
-- **MCP server appears but returns auth errors**: normal on first use — re-authenticate via the MCP's OAuth flow. Do not attempt to copy tokens from `~/.tabnine/agent/mcp-oauth-tokens.json`.
-- **User wants to reverse the migration**: the wizard doesn't delete Tabnine sources, so reversing means deleting the newly created files under `<target>/{mcp entries, skills/*, agents/*.md, command/*.md}`. Offer to list them if asked.
+- **`OPENCODE_CONFIG_DIR` adds a config root, it does not move one.** Verified with `opencode debug paths`, `debug skill`, `agent list`, and `debug config` against a scratch dir: the reported `config` root stays `~/.config/opencode`, and skills, agents, and `opencode.json` are loaded from *both* that directory and the override. The Tabnine opencode wrapper sets it to `~/.tabnine/opencode/config`. Either is a valid target; installing the same `name` into both shadows one silently.
+- **opencode's MCP env key is `environment`.** An `env` key is accepted by the schema and then ignored, so the server starts with none of its variables and fails in a way that looks unrelated.
+- **MCP timeout defaults differ 120-fold.** Tabnine 600000 ms, opencode 5000 ms.
+- **Duplicate `name` is silent.** opencode logs `duplicate skill name` to the log only; the last copy scanned wins and the other never runs.
+- **`~/.claude/skills` is already scanned by opencode.** Never copy from there unless the user explicitly asks — it creates a duplicate, not an addition. When discovery finds these, say they are already visible and skip them by default.
+- **Agent and command folders accept both spellings.** The loaders glob `{agent,agents}/**/*.md` and `{command,commands}/**/*.md`.
+- **A Tabnine `tools` list is an allowlist.** Omitting it in translation grants everything.
 
 ## Reference material
 
-See `references/source-map.md` for the exhaustive list of Tabnine CLI config paths (with the code-verified precedence rules), and `references/mapping.md` for the complete field translation table with edge cases.
+`references/mapping.md` — the field-by-field translation tables. Read before the first write of each category.
 
-If you need to verify an opencode field shape before writing, fetch `https://opencode.ai/config.json` or load the built-in `customize-opencode` skill.
+`references/verification-and-recovery.md` — the optional post-migration verification commands, and the recovery steps for a failed migration. Read it when the user asks you to verify the migration, or when something has gone wrong.
+
+`references/source-map.md` — the exhaustive Tabnine path list with code-verified precedence. Read it when discovery is ambiguous: the user mentions Gemini mode, a managed/system settings file may be in play, extensions were found, an agent file's frontmatter parses as an array, or an enablement entry names a server you didn't find.
+
+To verify an opencode field shape before writing, fetch `https://opencode.ai/config.json` or load the built-in `customize-opencode` skill.
