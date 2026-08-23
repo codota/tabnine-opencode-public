@@ -21,7 +21,12 @@ You are migrating the user's Tabnine CLI context/memory files into opencode's `A
 
 1. Determine the context filename(s). Default is `TABNINE.md` (`GEMINI.md` if the user is on plain Gemini CLI). Check `context.fileName` in `~/.tabnine/agent/settings.json` and `<cwd>/.tabnine/agent/settings.json` — it may be a single string or an array of names (e.g. `["AGENTS.md", "TABNINE.md"]`).
 2. Find source files:
-   - **Project**: `<cwd>/<name>` for each configured name, plus subdirectory matches (`**/<name>`, skipping `node_modules`, `.git`, and other vendored dirs). A subdirectory file maps to a sibling `AGENTS.md` in the same directory — but read "Subdirectory context loads differently" below before planning those, because the copy is faithful while the loading behaviour is not.
+   - **Project**: search in three directions, because Tabnine reads all three and missing one loses context silently.
+     - `<cwd>/<name>` for each configured name.
+     - **Upward**: each `<name>` in every ancestor directory from `<cwd>` to the project root (stop at the repository root, or at `$HOME`, whichever comes first). Tabnine walks upward the same way, so a session started in `packages/api` still reads the repository-root file. If the wizard is run from a subdirectory, these ancestors are usually the most important files to migrate — never skip them because the user happened to start the wizard deeper in the tree.
+     - **Downward**: `**/<name>`, skipping `node_modules`, `.git`, `dist`, `build`, and other vendored or generated directories.
+
+     Each file maps to a sibling `AGENTS.md` in its own directory. Ancestor and `<cwd>` files migrate cleanly, since opencode loads them from the session directory upward. Files *below* the session directory do not — read "Subdirectory context loads differently" before planning those.
    - **Global**: `~/.tabnine/agent/TABNINE.md` (or the Gemini equivalent). Target: `~/.config/opencode/AGENTS.md`. Offer this only if it hasn't been migrated already — if the target exists and already contains the source content, report "already migrated" and skip.
 
    The global target is always `~/.config/opencode/AGENTS.md`, even when `OPENCODE_CONFIG_DIR` is set. opencode resolves the global instruction file from its config root only, so unlike skills and agents — which load from both directories — an `AGENTS.md` inside an `OPENCODE_CONFIG_DIR` such as `~/.tabnine/opencode/config` is never read. Never write one there.
@@ -40,6 +45,8 @@ They differ below the session directory. Tabnine loads a subdirectory's context 
 Copying the file is still the right default, since it behaves correctly for anyone who opens sessions in that subdirectory. But never migrate one silently. For each subdirectory file, say in the plan that it will apply only to sessions started in that directory, and offer the alternative: merge its content into the project-root `AGENTS.md`, attributed with the directory it came from, so it always loads. Merging widens the instruction's scope from one subtree to the whole repository, so it changes behaviour — offer it, explain that trade-off in one line, and let the user choose per file.
 
 Print what was found (path, size, target) and ask which files to migrate. If nothing was found, say so and stop.
+
+In a large repository the downward search can match many files. Above roughly ten, do not print one line each: group them by directory depth, give the count and the total size, and list the paths only for the ancestor and `<cwd>` files plus any subdirectory file larger than a few kilobytes. Then ask whether to migrate the subdirectory files as a group, as a group excluding named exceptions, or individually. The per-file choice described below still applies to whatever the user selects — grouping is a way to keep the prompt readable, not a way to skip the decision.
 
 ## Phase 2 — Write plan, then write
 
