@@ -21,13 +21,21 @@ You are migrating the user's Tabnine CLI context/memory files into opencode's `A
 
 1. Determine the context filename(s). Default is `TABNINE.md` (`GEMINI.md` if the user is on plain Gemini CLI). Check `context.fileName` in `~/.tabnine/agent/settings.json` and `<cwd>/.tabnine/agent/settings.json` — it may be a single string or an array of names (e.g. `["AGENTS.md", "TABNINE.md"]`).
 2. Find source files:
-   - **Project**: `<cwd>/<name>` for each configured name, plus subdirectory matches (`**/<name>`, skipping `node_modules`, `.git`, and other vendored dirs). Tabnine reads these hierarchically; opencode reads `AGENTS.md` per directory, so subdirectory files map to a sibling `AGENTS.md` in the same directory.
+   - **Project**: `<cwd>/<name>` for each configured name, plus subdirectory matches (`**/<name>`, skipping `node_modules`, `.git`, and other vendored dirs). A subdirectory file maps to a sibling `AGENTS.md` in the same directory — but read "Subdirectory context loads differently" below before planning those, because the copy is faithful while the loading behaviour is not.
    - **Global**: `~/.tabnine/agent/TABNINE.md` (or the Gemini equivalent). Target: `~/.config/opencode/AGENTS.md`. Offer this only if it hasn't been migrated already — if the target exists and already contains the source content, report "already migrated" and skip.
 
    The global target is always `~/.config/opencode/AGENTS.md`, even when `OPENCODE_CONFIG_DIR` is set. opencode resolves the global instruction file from its config root only, so unlike skills and agents — which load from both directories — an `AGENTS.md` inside an `OPENCODE_CONFIG_DIR` such as `~/.tabnine/opencode/config` is never read. Never write one there.
 
    Check for that mistake while discovering. If `OPENCODE_CONFIG_DIR` is set and an `AGENTS.md` already exists inside it, report it as present but never loaded, and offer to move its content to `~/.config/opencode/AGENTS.md` — as a merge, through the normal plan and backup flow. It is the one case where this skill's source is an opencode file rather than a Tabnine one, so state plainly where the content came from and leave the original in place unless the user asks otherwise.
-3. If a configured name is already `AGENTS.md`, opencode reads it natively — report it as "no migration needed".
+3. If a configured name is already one opencode reads natively, report it as "no migration needed" and skip. opencode reads `AGENTS.md`, `CLAUDE.md`, and `CONTEXT.md` in each directory it walks, plus `~/.claude/CLAUDE.md` globally. A user whose `context.fileName` is `CONTEXT.md` needs no migration at all.
+
+### Subdirectory context loads differently
+
+The two systems agree on the global file and on ancestor directories: both read the global context, then every context file from the session's directory upward to the project root, concatenating them.
+
+They differ below the session directory. Tabnine loads a subdirectory's context file on demand when the agent touches that subtree, so `packages/api/TABNINE.md` applies even in a session started at the repository root. opencode only globs upward from the session directory and never loads context from a subdirectory it has not been pointed at. A migrated `packages/api/AGENTS.md` is therefore inert in a root-level session, and applies only when opencode is started inside `packages/api`.
+
+Copying the file is still the right default, since it behaves correctly for anyone who opens sessions in that subdirectory. But never migrate one silently. For each subdirectory file, say in the plan that it will apply only to sessions started in that directory, and offer the alternative: merge its content into the project-root `AGENTS.md`, attributed with the directory it came from, so it always loads. Merging widens the instruction's scope from one subtree to the whole repository, so it changes behaviour — offer it, explain that trade-off in one line, and let the user choose per file.
 
 Print what was found (path, size, target) and ask which files to migrate. If nothing was found, say so and stop.
 
@@ -39,6 +47,8 @@ After the user selects files, print the plan and stop for approval. One line per
 Mode: plan (nothing written yet)
   create  /Users/me/project/AGENTS.md              (from TABNINE.md, 2.4 KB)
   merge   /Users/me/.config/opencode/AGENTS.md     (append; backup .bak-20260823-181500)
+  create  /Users/me/project/packages/api/AGENTS.md (from packages/api/TABNINE.md)
+          applies only to sessions started in packages/api
   skip    /Users/me/project/docs/AGENTS.md         (already contains this content)
 ```
 
@@ -62,5 +72,6 @@ Once approved, for each selected source file the target is `AGENTS.md` in the sa
 
 - Reconcile against the plan: what was written, merged, and skipped, with paths and backup paths, plus anything that differed from the plan.
 - List any files flagged for import-syntax review.
+- List every subdirectory file written, restating that each applies only to sessions started in its directory, so the user is not surprised when a root-level session ignores it.
 - Remind the user: sources were not modified; re-run this skill in other repositories as needed.
 - Restart reminder: "Restart opencode (or start a new session) to pick up the new AGENTS.md."

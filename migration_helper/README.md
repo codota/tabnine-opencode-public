@@ -116,6 +116,8 @@ Credentials are handled carefully throughout. The wizard prints the names of env
 
 To migrate your `TABNINE.md` context files into `AGENTS.md`, run `/migrate-context` (or ask "migrate my tabnine context files"). That skill is scoped per repository, so re-run it in each project whose context files you want to bring over. It follows the same plan-then-approve flow, and because a merge appends to an `AGENTS.md` you already rely on, it backs up the existing file first.
 
+Context in a subdirectory is worth a moment's attention. Both tools read your global context file and every context file from the current directory up to the project root. They differ further down: Tabnine CLI picks up a subdirectory's context whenever the agent works in that subtree, while opencode reads context from the session's directory upward only. A file migrated to `packages/api/AGENTS.md` therefore applies when you start opencode inside `packages/api`, but not from the repository root. The wizard points this out for each such file and offers to fold its content into the project-root `AGENTS.md` instead, which makes it always apply at the cost of widening its scope to the whole repository.
+
 ## Uninstall
 
 Remove the paths the installer created:
