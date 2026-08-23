@@ -122,7 +122,7 @@ OPENCODE_DISABLE_PROJECT_CONFIG=1 opencode
 
 This does not bypass the global `~/.config/opencode/` config — for a global install, edit (or restore the timestamped backup of) the offending file directly, using the field-by-field rules in `skills/migrate-from-tabnine-cli/references/mapping.md` as a reference.
 
-A `duplicate skill name` warning (written to opencode's log, not shown in the UI) means two skills share the same `name` field under paths opencode scans (`~/.config/opencode/skills/`, `~/.claude/skills/`, `~/.agents/skills/`, the directory named by `OPENCODE_CONFIG_DIR` if it is set, and the equivalent workspace paths). Which copy wins is not deterministic, so remove or rename one of them.
+A `duplicate skill name` warning (written to opencode's log, not shown in the UI) means two skills share the same `name` field under paths opencode scans (`~/.config/opencode/skills/`, `~/.claude/skills/`, `~/.agents/skills/`, the directory named by `OPENCODE_CONFIG_DIR` if it is set, and the equivalent workspace paths). opencode keeps the last copy it scans and silently shadows the other, so remove or rename one of them. The log line names both paths.
 
 If your launcher sets `OPENCODE_CONFIG_DIR` (the Tabnine opencode wrapper points it at `~/.tabnine/opencode/config`), note that it *adds* a config root rather than replacing the default one. `opencode debug paths` still reports `~/.config/opencode` as the config root, and skills, agents, and `opencode.json` are loaded from both directories. Installing into `~/.config/opencode/` works either way; just don't install the same items into both roots.
 

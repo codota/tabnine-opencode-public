@@ -117,7 +117,7 @@ Direct copy. Both systems use `SKILL.md` with the same required frontmatter fiel
 Do not rewrite:
 
 - Skill bodies. If a skill references Gemini binaries, that's a semantic change and the user should decide.
-- The `name` field. It must stay unique across all scanned paths. On collision opencode only logs a warning (the user never sees it) and which copy wins is non-deterministic — so a duplicate is a silent coin-flip, not a visible error. Avoid creating one.
+- The `name` field. It must stay unique across all scanned paths. On collision opencode logs `duplicate skill name` with both locations (to the log only, never the UI) and the last copy scanned wins. Deterministic, but scan-order dependent and invisible to the user, so the shadowed copy simply never runs. Avoid creating one.
 
 Optional frontmatter fields opencode also accepts (see `customize-opencode`): `license`, `compatibility`, `metadata`. Preserve if present, remove none.
 
@@ -139,7 +139,7 @@ Split frontmatter and body. Translate frontmatter. Body copies verbatim.
 | `name` | `name` | Keep. Both use lowercase-hyphen slug. |
 | `description` | `description` | Keep. |
 | `display_name` | — | Drop. |
-| `tools` | — | Drop. opencode uses `permission` (per-tool allow/ask/deny). If the user wants an equivalent, ask before generating a permission block; don't guess. |
+| `tools` | `permission` | **Translate. Do not drop.** Tabnine `tools` is a YAML list of *allowed* tool names, so dropping it grants the agent everything, including `bash`, `write`, and `edit`. See "Tool allowlist translation" below. |
 | `mcp_servers` | — | Drop from the agent frontmatter. Ask the user if these should be hoisted into top-level `mcp` in `opencode.json` (they'll then be visible to all agents, not just this one). Note the frontmatter variant uses snake_case keys (`http_url`, `include_tools`, `exclude_tools`) — translate them like their camelCase settings.json equivalents. |
 | `model: inherit` | — | Drop. Subagents inherit from parent by default; primaries fall back to global `model`. |
 | `model: <provider>/<id>` | `model` | Keep if the value is already `provider/model-id` format. |
@@ -151,12 +151,55 @@ Split frontmatter and body. Translate frontmatter. Body copies verbatim.
 
 Body → agent prompt, no changes.
 
+### Tool allowlist translation
+
+Tabnine restricts an agent with a list of allowed tool names:
+
+```yaml
+tools:
+  - read_file
+  - run_shell_command
+```
+
+opencode expresses the same intent with `permission` (preferred) or the deprecated `tools` map. Both accept `*` as a wildcard, and the **last matching rule wins**, so put `*` first and the allowlist after:
+
+```yaml
+permission:
+  "*": deny
+  read: allow
+  bash: allow
+```
+
+Tool names are not the same in the two systems. Map them:
+
+| Tabnine tool | opencode permission key |
+| --- | --- |
+| `read_file`, `read_many_files` | `read` |
+| `write_file` | `edit` (gates `write`, `edit`, `apply_patch`) |
+| `replace` | `edit` |
+| `run_shell_command` | `bash` |
+| `glob` | `glob` |
+| `search_file_content` | `grep` |
+| `list_directory` | `list` |
+| `web_fetch` | `webfetch` |
+| `google_web_search` | `websearch` |
+| `save_memory` | — (no equivalent; note it to the user) |
+| `list_background_processes`, `read_background_output` | — (no equivalent; both are covered by `bash` in opencode) |
+
+Rules:
+
+- `write_file` and `replace` both map to `edit`, so an agent allowed only `replace` still gets write access under opencode. Say so explicitly — it is a widening of privilege that the mapping cannot avoid.
+- An MCP-provided tool in the Tabnine list has no opencode built-in equivalent. Match it as a wildcard against the server name (`"mymcp_*": "allow"`) and tell the user which entries you translated this way.
+- If a listed tool has no mapping at all, do **not** silently drop it. List the unmapped names in the summary so the user can decide.
+- Never invent a permission the source did not grant. Deny-by-default plus the mapped allowlist is the whole translation.
+
+
 ### Remote (A2A) agents
 
 opencode has no built-in A2A remote agent kind. Two options:
 
-1. **Skip** with a warning. Simplest.
-2. If the remote agent is really important, offer to create a subagent whose body calls the remote via `webfetch` or a bespoke MCP. This is a manual step — do not auto-generate.
+1. **Skip with a warning — this is the default.** Report the file as "remote agent: skipped (no opencode equivalent)" and move on.
+2. Only if the user explicitly asks: offer to hand-write a subagent whose body calls the remote via `webfetch` or a bespoke MCP. Never auto-generate this.
 
 ### Example translation
 
