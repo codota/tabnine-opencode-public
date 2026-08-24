@@ -23,7 +23,7 @@ Then verify three things on disk, which no command covers:
 2. Every relative `references/…` or `scripts/…` path mentioned in a migrated body resolves to a file that exists.
 3. No skill `name` appears in more than one scanned root.
 
-Report failures as findings and ask before changing anything — Phase 4 already ended the write window (core rule 7).
+Report failures as findings and ask before changing anything. The migration's write window closes at the Phase 5 summary; verification never reopens it.
 
 ## When things go wrong
 

@@ -8,12 +8,12 @@ Nothing is deleted from your Tabnine CLI installation. This is a copy-and-transl
 
 Two skills are included:
 
-- **`migrate-from-tabnine-cli`** (`/migrate`) — MCP servers, skills, subagents, slash commands, and extension contents. Run once per target scope (global or project).
+- **`migrate-from-tabnine-cli`** (`/migrate`) — MCP servers, skills, agents, slash commands, and extension contents. Run once per target scope (global or project).
 - **`migrate-tabnine-context`** (`/migrate-context`) — context/memory files (`TABNINE.md`, or custom `context.fileName` files) into opencode's `AGENTS.md`. Re-runnable in every repository you work in.
 
 ## What gets migrated
 
-MCP servers, skills, subagents, slash commands, the contents of Tabnine CLI extensions, and context files (`TABNINE.md` → `AGENTS.md`, via the second skill). Fields with no opencode equivalent are dropped and listed in the summary. See `skills/migrate-from-tabnine-cli/references/mapping.md` for the complete field-by-field translation table.
+MCP servers, skills, agents, slash commands, extension contents, and context files (`TABNINE.md` → `AGENTS.md`, via the second skill). Fields with no opencode equivalent are dropped and listed in the summary. See `skills/migrate-from-tabnine-cli/references/mapping.md` for the complete field-by-field translation table.
 
 Two translations change values rather than copying them, and the wizard reports both when it runs.
 
@@ -114,7 +114,7 @@ migrate my tabnine cli config to opencode
 Either entry point activates the same skill. The wizard runs in four steps:
 
 1. **Discover** — scans for Tabnine CLI configuration and prints an inventory of what it found.
-2. **Ask** — one question per category: target scope, MCP servers, skills, subagents, commands, and extensions.
+2. **Ask** — one question per category: target scope, MCP servers, skills, agents, slash commands, and extensions.
 3. **Plan** — shows exactly what it intends to do before doing any of it: the target directory, every file it will create, overwrite, or back up, the MCP servers it will connect, and any change to an agent's permissions. Nothing has been written yet, and it waits for your approval.
 4. **Write** — carries out the approved plan, then reports what was written and anything that differed from the plan.
 

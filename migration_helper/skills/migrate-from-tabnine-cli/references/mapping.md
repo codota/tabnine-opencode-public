@@ -152,7 +152,7 @@ Split frontmatter and body. Translate frontmatter. Body copies verbatim.
 
 ### Allowed opencode frontmatter fields
 
-`name, model, variant, description, mode, hidden, color, steps, options, permission, disable, temperature, top_p`. Unknown fields are silently routed into `options` where they have no effect — so drop them explicitly.
+`name, model, variant, description, mode, hidden, color, steps, options, permission, disable, temperature, top_p`. Unknown fields are collected into `options` and passed through to the model provider as extra request fields. Most providers ignore what they don't recognise; some reject the request. Drop them explicitly.
 
 ### Local-agent field mapping
 

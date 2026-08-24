@@ -75,16 +75,7 @@ Local agents can embed `mcp_servers:` in their YAML frontmatter. These are scope
 
 Tabnine CLI ships two built-in MCP servers, `tabnine-context` and `tabnine-coaching`. opencode's Tabnine plugin registers the same two automatically, so they are never migrated as MCP entries.
 
-The plugin's opt-out lives in plugin options, not in `mcp.<name>.enabled`:
-
-| Server            | Plugin option              | Env var                              |
-| ----------------- | -------------------------- | ------------------------------------ |
-| `tabnine-context` | `enableRemoteCodeSearch`   | `TABNINE_ENABLE_REMOTE_CODE_SEARCH`  |
-| `tabnine-coaching`| `enableCoaching`           | `TABNINE_ENABLE_COACHING`            |
-
-Plugin options are passed as the second element of a tuple in `opencode.json`'s `plugin` array — for example, `"plugin": [["@tabnine/opencode-auth", { "enableRemoteCodeSearch": false }]]`. Env vars accept `"0"` or `"false"` to disable.
-
-If the user's `mcp-server-enablement.json` disables either name, translate that opt-out into the plugin options (or the env var equivalent), not into a stub `mcp` entry.
+If the user's `mcp-server-enablement.json` disables either, translate that opt-out into the plugin's options rather than a stub `mcp` entry. The option names, env-var equivalents, and a worked `opencode.json` example live in `mapping.md`.
 
 ### Per-server enablement
 
