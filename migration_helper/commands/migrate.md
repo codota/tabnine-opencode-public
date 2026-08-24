@@ -1,5 +1,5 @@
 ---
-description: Migrate Tabnine CLI (or Gemini CLI) configuration into opencode.
+description: Migrate Tabnine CLI configuration into opencode.
 ---
 
 Load the migrate-from-tabnine-cli skill and run the interactive migration wizard.

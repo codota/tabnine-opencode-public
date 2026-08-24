@@ -1,11 +1,11 @@
 ---
 name: migrate-from-tabnine-cli
-description: Wizard that migrates Tabnine CLI (a Gemini CLI fork) configuration into opencode. Use ONLY when the user asks to migrate, import, copy, or move Tabnine CLI (or Gemini CLI) skills, agents, subagents, MCP servers, slash commands, or extensions into opencode, or mentions moving from `~/.tabnine/agent`, `.tabnine/agent`, `.gemini`, or similar dirs. Not for migrating code, repos, or data; not for Claude Code skills (opencode reads `~/.claude/skills` natively); not for copying config between machines; not for context/memory files (TABNINE.md) — that's the migrate-tabnine-context skill.
+description: Wizard that migrates Tabnine CLI configuration into opencode. Use ONLY when the user asks to migrate, import, copy, or move Tabnine CLI skills, agents, subagents, MCP servers, slash commands, or extensions into opencode, or mentions moving from `~/.tabnine/agent` or `.tabnine/agent`. Not for migrating code, repos, or data; not for Claude Code skills (opencode reads `~/.claude/skills` natively); not for copying config between machines; not for context/memory files (TABNINE.md) — that's the migrate-tabnine-context skill.
 ---
 
 # Migrate from Tabnine CLI to opencode
 
-Discover the user's Tabnine CLI (or Gemini CLI) configuration on disk, ask exactly what to move where, translate incompatible fields, and install the results without tripping opencode's config validation. This is an interactive wizard: it asks per category and it writes only what the user approved.
+Discover the user's Tabnine CLI configuration on disk, ask exactly what to move where, translate incompatible fields, and install the results without tripping opencode's config validation. This is an interactive wizard: it asks per category and it writes only what the user approved.
 
 ## Core rules
 
@@ -30,7 +30,6 @@ Check each of these, all optional, under `~/.tabnine/agent/` (user) and `<cwd>/.
 - `settings.json` → the `mcpServers` object. `mcp-server-enablement.json` → `{ name: { enabled: false } }` marks a server disabled.
 - `skills/*/SKILL.md`, `agents/*.md`, `commands/**/*.toml`, `extensions/*/tabnine-extension.json` (an extension may bundle any of the others).
 - Also `~/.agents/skills/*/SKILL.md` and `<cwd>/.agents/skills/…`.
-- If the user is on plain Gemini CLI, the same layout lives under `.gemini/` and `~/.gemini/`.
 - `~/.claude/skills/*/SKILL.md` — opencode already scans this; see Gotchas.
 
 `references/source-map.md` has the exhaustive path list and the precedence rules.
@@ -220,6 +219,6 @@ Environment facts that defy reasonable assumptions. Read before Phase 1.
 
 `references/verification-and-recovery.md` — the optional post-migration verification commands, and the recovery steps for a failed migration. Read it when the user asks you to verify the migration, or when something has gone wrong.
 
-`references/source-map.md` — the exhaustive Tabnine path list with code-verified precedence. Read it when discovery is ambiguous: the user mentions Gemini mode, a managed/system settings file may be in play, extensions were found, an agent file's frontmatter parses as an array, or an enablement entry names a server you didn't find.
+`references/source-map.md` — every Tabnine CLI configuration path with its precedence rules. Read it when discovery is ambiguous: a managed or system settings file may be in play, extensions were found, an agent file's frontmatter parses as an array, or an enablement entry names a server you didn't find.
 
 To verify an opencode field shape before writing, fetch `https://opencode.ai/config.json` or load the built-in `customize-opencode` skill.

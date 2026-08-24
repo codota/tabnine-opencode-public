@@ -1,6 +1,6 @@
 # Migration helper: Tabnine CLI to opencode
 
-Copies your Tabnine CLI (or Gemini CLI) configuration into an opencode configuration directory. These are interactive wizards that run inside opencode: each one scans your disk, shows what it found, and asks what you want to migrate.
+Copies your Tabnine CLI configuration into an opencode configuration directory. These are interactive wizards that run inside opencode: each one scans your disk, shows what it found, and asks what you want to migrate.
 
 Every write is shown to you for approval before it happens, and no existing file is replaced without your consent and a timestamped backup.
 
@@ -9,7 +9,7 @@ Nothing is deleted from your Tabnine CLI installation. This is a copy-and-transl
 Two skills are included:
 
 - **`migrate-from-tabnine-cli`** (`/migrate`) — MCP servers, skills, subagents, slash commands, and extension contents. Run once per target scope (global or project).
-- **`migrate-tabnine-context`** (`/migrate-context`) — context/memory files (`TABNINE.md`, `GEMINI.md`, or custom `context.fileName` files) into opencode's `AGENTS.md`. Re-runnable in every repository you work in.
+- **`migrate-tabnine-context`** (`/migrate-context`) — context/memory files (`TABNINE.md`, or custom `context.fileName` files) into opencode's `AGENTS.md`. Re-runnable in every repository you work in.
 
 ## What gets migrated
 

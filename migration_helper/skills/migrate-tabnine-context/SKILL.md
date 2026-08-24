@@ -1,6 +1,6 @@
 ---
 name: migrate-tabnine-context
-description: Migrates Tabnine CLI context/memory files (TABNINE.md, GEMINI.md, or custom context.fileName files) into opencode's AGENTS.md. Use ONLY when the user asks to migrate, import, or copy Tabnine CLI (or Gemini CLI) context files, memory files, TABNINE.md, or GEMINI.md into opencode or AGENTS.md. Re-runnable per repository. Not for MCP servers, skills, agents, or slash commands — that's the migrate-from-tabnine-cli skill.
+description: Migrates Tabnine CLI context/memory files (TABNINE.md, or custom context.fileName files) into opencode's AGENTS.md. Use ONLY when the user asks to migrate, import, or copy Tabnine CLI context files, memory files, or TABNINE.md into opencode or AGENTS.md. Re-runnable per repository. Not for MCP servers, skills, agents, or slash commands — that's the migrate-from-tabnine-cli skill.
 ---
 
 # Migrate Tabnine CLI context files to opencode
@@ -19,7 +19,7 @@ You are migrating the user's Tabnine CLI context/memory files into opencode's `A
 
 ## Phase 1 — Discover
 
-1. Determine the context filename(s). Default is `TABNINE.md` (`GEMINI.md` if the user is on plain Gemini CLI). Check `context.fileName` in `~/.tabnine/agent/settings.json` and `<cwd>/.tabnine/agent/settings.json` — it may be a single string or an array of names (e.g. `["AGENTS.md", "TABNINE.md"]`).
+1. Determine the context filename(s). Default is `TABNINE.md`. Check `context.fileName` in `~/.tabnine/agent/settings.json` and `<cwd>/.tabnine/agent/settings.json` — it may be a single string or an array of names (e.g. `["AGENTS.md", "TABNINE.md"]`).
 2. Find source files:
    - **Project**: search in three directions, because Tabnine reads all three and missing one loses context silently.
      - `<cwd>/<name>` for each configured name.
@@ -27,14 +27,14 @@ You are migrating the user's Tabnine CLI context/memory files into opencode's `A
      - **Downward**: `**/<name>`, skipping `node_modules`, `.git`, `dist`, `build`, and other vendored or generated directories.
 
      Each file maps to a sibling `AGENTS.md` in its own directory. Ancestor and `<cwd>` files migrate cleanly, since opencode loads them from the session directory upward. Files *below* the session directory do not — read "Subdirectory context loads differently" before planning those.
-   - **Global**: `~/.tabnine/agent/TABNINE.md` (or the Gemini equivalent). Target: `~/.config/opencode/AGENTS.md`. Offer this only if it hasn't been migrated already — if the target exists and already contains the source content, report "already migrated" and skip.
+   - **Global**: `~/.tabnine/agent/TABNINE.md`. Target: `~/.config/opencode/AGENTS.md`. Offer this only if it hasn't been migrated already — if the target exists and already contains the source content, report "already migrated" and skip.
 
    The global target is always `~/.config/opencode/AGENTS.md`, even when `OPENCODE_CONFIG_DIR` is set. opencode resolves the global instruction file from its config root only, so unlike skills and agents — which load from both directories — an `AGENTS.md` inside an `OPENCODE_CONFIG_DIR` such as `~/.tabnine/opencode/config` is never read. Never write one there.
 
    Check for that mistake while discovering. If `OPENCODE_CONFIG_DIR` is set and an `AGENTS.md` already exists inside it, report it as present but never loaded, and offer to move its content to `~/.config/opencode/AGENTS.md` — as a merge, through the normal plan and backup flow. It is the one case where this skill's source is an opencode file rather than a Tabnine one, so state plainly where the content came from and leave the original in place unless the user asks otherwise.
 3. If a configured name is already `AGENTS.md`, opencode reads it natively — report it as "no migration needed" and skip.
 
-The sources this skill migrates are Tabnine CLI's context files: `TABNINE.md` by default, `GEMINI.md` in legacy Gemini mode, or whatever `context.fileName` specifies. Nothing else is in scope.
+The sources this skill migrates are Tabnine CLI's context files: `TABNINE.md` by default, or whatever `context.fileName` specifies. Nothing else is in scope.
 
 ### Subdirectory context loads differently
 
