@@ -12,7 +12,7 @@ Get the installer for your platform from the [Releases page](https://github.com/
 
 Installation, sign-in, and usage instructions are in the documentation:
 
-- **Documentation:** https://docs.tabnine.com
+- **Documentation:** https://docs.tabnine.com/main/getting-started/tabnine-plugin-for-opencode
 
 Supported platforms: macOS (x64, arm64), Linux (x64, arm64), and Windows (x64, arm64).
 
