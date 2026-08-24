@@ -81,6 +81,29 @@ Source (`~/.tabnine/agent/settings.json`):
 }
 ```
 
+### Built-in servers (`tabnine-context`, `tabnine-coaching`)
+
+Never write these into `mcp`. opencode's Tabnine plugin registers both automatically, and a duplicate under `mcp` would collide.
+
+If the user's `mcp-server-enablement.json` disables either, translate the opt-out into the plugin's options rather than into `mcp.<name>.enabled` (which the plugin does not read):
+
+| Server              | Plugin option              | Env var                              |
+| ------------------- | -------------------------- | ------------------------------------ |
+| `tabnine-context`   | `enableRemoteCodeSearch`   | `TABNINE_ENABLE_REMOTE_CODE_SEARCH`  |
+| `tabnine-coaching`  | `enableCoaching`           | `TABNINE_ENABLE_COACHING`            |
+
+Set the option as the second element of the plugin tuple in `opencode.json`:
+
+```json
+{
+  "plugin": [
+    ["@tabnine/opencode-auth", { "enableRemoteCodeSearch": false }]
+  ]
+}
+```
+
+Env vars accept `"0"` or `"false"` to disable. Precedence: plugin option > env var > default `true`.
+
 Enablement (`~/.tabnine/agent/mcp-server-enablement.json`):
 
 ```json

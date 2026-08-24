@@ -128,6 +128,7 @@ Translate to opencode `mcp: { name: { type, url|command, headers?, environment?,
 - Rewrite `$VAR` / `${VAR}` to `{env:VAR}` everywhere it appears, including mid-string (`"Bearer $TOKEN"` → `"Bearer {env:TOKEN}"`) and in `headers` as much as `environment`.
 - `enabled: false` if the enablement file disables it, else `enabled: true`. Ignore enablement entries with no matching server.
 - Never copy `mcp-oauth-tokens.json`. Tokens do not carry over; the user re-authenticates on first use.
+- The built-in `tabnine-context` / `tabnine-coaching` servers are never migrated as `mcp` entries — opencode's Tabnine plugin registers them. If the user disabled either in `mcp-server-enablement.json`, that opt-out must be translated into the plugin's options rather than dropped; see `references/mapping.md`.
 
 If the target `opencode.json` exists: back it up to `opencode.json.bak-<YYYYMMDD-HHMMSS>`, then merge into its `mcp` object rather than replacing it, preserving `$schema`, `plugin`, and every other existing key. If it does not exist, create it with `"$schema": "https://opencode.ai/config.json"` — no backup needed, and say so in the summary so the recovery advice matches reality.
 

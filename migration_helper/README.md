@@ -21,6 +21,14 @@ Agent tool restrictions are preserved. A Tabnine agent that limits itself to a l
 
 MCP server timeouts are written explicitly. Tabnine CLI allows an MCP request 10 minutes by default and opencode allows 5 seconds, so the wizard records the original 10-minute value instead of letting a migrated server inherit a much shorter one.
 
+### Tabnine's built-in MCP servers
+
+Two MCP servers ship inside Tabnine CLI: `tabnine-context` (Remote Codebase Search) and `tabnine-coaching` (Coaching Guidelines). opencode's Tabnine plugin registers both automatically, so the wizard never copies them into `opencode.json`. If either was disabled in Tabnine, the wizard tells you how to keep it disabled in opencode — by setting `enableRemoteCodeSearch: false` or `enableCoaching: false` in the plugin's options, or by setting `TABNINE_ENABLE_REMOTE_CODE_SEARCH=0` / `TABNINE_ENABLE_COACHING=0` in your environment.
+
+### Tabnine sign-in does not carry over
+
+opencode's Tabnine plugin uses its own credential storage, so your Tabnine CLI sign-in cannot be reused. After running the migration, sign in to opencode's Tabnine plugin the way you would on a fresh install. The wizard never copies credential files.
+
 ## What does NOT get migrated
 
 OAuth tokens (`~/.tabnine/agent/mcp-oauth-tokens.json`), Tabnine credentials, and Tabnine-specific admin policy fields — you will re-authenticate each remote MCP server on first use. Also out of scope: hooks, themes, keybindings, and general settings (model selection, approval mode); configure those directly in opencode.

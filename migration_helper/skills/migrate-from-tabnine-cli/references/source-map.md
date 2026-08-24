@@ -73,12 +73,18 @@ Local agents can embed `mcp_servers:` in their YAML frontmatter. These are scope
 
 ### Source 4: Tabnine built-in MCP servers
 
-Tabnine CLI ships two built-in MCP servers:
+Tabnine CLI ships two built-in MCP servers, `tabnine-context` and `tabnine-coaching`. opencode's Tabnine plugin registers the same two automatically, so they are never migrated as MCP entries.
 
-- `tabnine-context` → `{tabnineHost}/indexer/mcp`
-- `tabnine-coaching` → `{tabnineHost}/coaching/api/mcp`
+The plugin's opt-out lives in plugin options, not in `mcp.<name>.enabled`:
 
-These are already the same servers opencode's Tabnine plugin registers. **Do not migrate them** — they would conflict with the plugin.
+| Server            | Plugin option              | Env var                              |
+| ----------------- | -------------------------- | ------------------------------------ |
+| `tabnine-context` | `enableRemoteCodeSearch`   | `TABNINE_ENABLE_REMOTE_CODE_SEARCH`  |
+| `tabnine-coaching`| `enableCoaching`           | `TABNINE_ENABLE_COACHING`            |
+
+Plugin options are passed as the second element of a tuple in `opencode.json`'s `plugin` array — for example, `"plugin": [["@tabnine/opencode-auth", { "enableRemoteCodeSearch": false }]]`. Env vars accept `"0"` or `"false"` to disable.
+
+If the user's `mcp-server-enablement.json` disables either name, translate that opt-out into the plugin options (or the env var equivalent), not into a stub `mcp` entry.
 
 ### Per-server enablement
 
@@ -205,6 +211,6 @@ Skill-as-command loader also exposes each skill as a slash command that activate
 ## Post-migration notes
 
 - opencode's Tabnine plugin already registers `tabnine-context` and `tabnine-coaching` MCP servers. Do not migrate those.
-- opencode's Tabnine plugin already provides Tabnine authentication, so `~/.tabnine/tabnine_creds.json` and `~/.tabnine/agent/tabnine-credentials.json` should not be touched.
+- opencode's Tabnine plugin uses its own credential storage (`~/.local/share/opencode/auth.json`, or overridden by `OPENCODE_AUTH_CONTENT`) and cannot read the Tabnine CLI's credential files (`~/.tabnine/tabnine_creds.json`, `~/.tabnine/agent/tabnine-credentials.json`). Never migrate those files; tell the user to sign in to opencode's Tabnine plugin separately after migration.
 - OAuth tokens in `~/.tabnine/agent/mcp-oauth-tokens.json` are Tabnine-CLI-specific and will not carry over to opencode. The user re-authenticates each MCP on first use.
 - Context/memory files (`TABNINE.md` at the project root and `~/.tabnine/agent/TABNINE.md` globally, plus any custom `context.fileName` names) are handled by the separate `migrate-tabnine-context` skill (`/migrate-context`), not this wizard. If discovery notices them, point the user there.
