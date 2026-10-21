@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   close:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-stepsecurity-x64
     if: >-
       github.event.pull_request.author_association != 'OWNER' &&
       github.event.pull_request.author_association != 'MEMBER' &&
