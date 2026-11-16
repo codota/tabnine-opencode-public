@@ -49,7 +49,7 @@ cd tabnine-opencode-public/migration_helper
 ./install.sh
 ```
 
-By default this installs globally into `~/.config/opencode/`. To install into the current project instead:
+By default this installs globally into `~/.tabnine/opencode/config/`. To install into the current project instead:
 
 ```bash
 ./install.sh --project
@@ -70,9 +70,9 @@ Manual copy is a fully supported alternative. It is the recommended path on Wind
 For a global install on macOS or Linux:
 
 ```bash
-mkdir -p ~/.config/opencode/skills ~/.config/opencode/commands
-cp -r migration_helper/skills/migrate-from-tabnine-cli migration_helper/skills/migrate-tabnine-context ~/.config/opencode/skills/
-cp migration_helper/commands/migrate.md migration_helper/commands/migrate-context.md ~/.config/opencode/commands/
+mkdir -p ~/.tabnine/opencode/config/skills ~/.tabnine/opencode/config/commands
+cp -r migration_helper/skills/migrate-from-tabnine-cli migration_helper/skills/migrate-tabnine-context ~/.tabnine/opencode/config/skills/
+cp migration_helper/commands/migrate.md migration_helper/commands/migrate-context.md ~/.tabnine/opencode/config/commands/
 ```
 
 For a project install on macOS or Linux:
@@ -86,9 +86,9 @@ cp migration_helper/commands/migrate.md migration_helper/commands/migrate-contex
 For a global install on Windows (PowerShell):
 
 ```powershell
-New-Item -ItemType Directory -Force "$env:USERPROFILE\.config\opencode\skills", "$env:USERPROFILE\.config\opencode\commands" | Out-Null
-Copy-Item -Recurse migration_helper\skills\migrate-from-tabnine-cli, migration_helper\skills\migrate-tabnine-context "$env:USERPROFILE\.config\opencode\skills\"
-Copy-Item migration_helper\commands\migrate.md, migration_helper\commands\migrate-context.md "$env:USERPROFILE\.config\opencode\commands\"
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.tabnine\opencode\config\skills", "$env:USERPROFILE\.tabnine\opencode\config\commands" | Out-Null
+Copy-Item -Recurse migration_helper\skills\migrate-from-tabnine-cli, migration_helper\skills\migrate-tabnine-context "$env:USERPROFILE\.tabnine\opencode\config\skills\"
+Copy-Item migration_helper\commands\migrate.md, migration_helper\commands\migrate-context.md "$env:USERPROFILE\.tabnine\opencode\config\commands\"
 ```
 
 If any of the target files already exist, back them up first. The installer script does this automatically; the manual commands above do not.
@@ -131,11 +131,11 @@ Context in a subdirectory is worth a moment's attention. Both tools read your gl
 Remove the paths the installer created:
 
 ```bash
-rm -rf ~/.config/opencode/skills/migrate-from-tabnine-cli ~/.config/opencode/skills/migrate-tabnine-context
-rm ~/.config/opencode/commands/migrate.md ~/.config/opencode/commands/migrate-context.md
+rm -rf ~/.tabnine/opencode/config/skills/migrate-from-tabnine-cli ~/.tabnine/opencode/config/skills/migrate-tabnine-context
+rm ~/.tabnine/opencode/config/commands/migrate.md ~/.tabnine/opencode/config/commands/migrate-context.md
 ```
 
-For a project install, replace `~/.config/opencode` with `.opencode`. Restart opencode after.
+For a project install, replace `~/.tabnine/opencode/config` with `.opencode`. Restart opencode after.
 
 ## Troubleshooting
 
@@ -157,11 +157,9 @@ If opencode fails to start after the migration with a `ConfigInvalidError`, one 
 OPENCODE_DISABLE_PROJECT_CONFIG=1 opencode
 ```
 
-This does not bypass the global `~/.config/opencode/` config — for a global install, edit (or restore the timestamped backup of) the offending file directly, using the field-by-field rules in `skills/migrate-from-tabnine-cli/references/mapping.md` as a reference.
+This does not bypass the global `~/.tabnine/opencode/config/` config — for a global install, edit (or restore the timestamped backup of) the offending file directly, using the field-by-field rules in `skills/migrate-from-tabnine-cli/references/mapping.md` as a reference.
 
-A `duplicate skill name` warning (written to opencode's log, not shown in the UI) means two skills share the same `name` field under paths opencode scans (`~/.config/opencode/skills/`, `~/.claude/skills/`, `~/.agents/skills/`, the directory named by `OPENCODE_CONFIG_DIR` if it is set, and the equivalent workspace paths). opencode keeps the last copy it scans and silently shadows the other, so remove or rename one of them. The log line names both paths.
-
-If your launcher sets `OPENCODE_CONFIG_DIR`, as the Tabnine opencode wrapper does, that directory is read in addition to `~/.config/opencode` rather than instead of it. opencode loads skills, agents, and `opencode.json` from both. Installing into `~/.config/opencode` therefore works either way, but avoid installing the same item into both directories, since one copy will shadow the other.
+A `duplicate skill name` warning (written to opencode's log, not shown in the UI) means two skills share the same `name` field under paths opencode scans (`~/.tabnine/opencode/config/skills/`, `~/.claude/skills/`, `~/.agents/skills/`, and the equivalent workspace paths). opencode keeps the last copy it scans and silently shadows the other, so remove or rename one of them. The log line names both paths.
 
 ## Reference documents
 

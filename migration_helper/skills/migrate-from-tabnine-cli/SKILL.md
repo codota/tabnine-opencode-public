@@ -63,9 +63,7 @@ Never list the built-in `tabnine-context` / `tabnine-coaching` servers as select
 
 Use the `question` tool. Order:
 
-1. **Target scope for this session** — global (`~/.config/opencode/`) or project (`./.opencode/` in the current worktree). Ask once at the start of the session. If the user later says something like "put this one in the project instead", re-scope only that category and keep the session default for the rest.
-
-   If `OPENCODE_CONFIG_DIR` is set, it does not redirect the global root — see Gotchas before choosing.
+1. **Target scope for this session** — global (`~/.tabnine/opencode/config/`) or project (`./.opencode/` in the current worktree). Ask once at the start of the session. If the user later says something like "put this one in the project instead", re-scope only that category and keep the session default for the rest.
 
 2. **MCP servers** — multi-select from the discovered list. Flag any name that already exists as `mcp.<name>` in the target `opencode.json`.
 3. **Skills** — multi-select. Flag any target-folder collision.
@@ -83,7 +81,7 @@ Resolve every selected item to a concrete destination, print the plan, and stop:
 
 ```
 Mode: plan (nothing written yet)
-Target root: /Users/me/.config/opencode   (OPENCODE_CONFIG_DIR is set elsewhere; not the target)
+Target root: /Users/me/.tabnine/opencode/config
 
 MCP endpoints granted to your agent:
   github-mcp   local    npx -y @modelcontextprotocol/server-github
@@ -206,8 +204,6 @@ After all writes succeed, run through this order — no step is skippable:
 
 Environment facts that defy reasonable assumptions. Read before Phase 1.
 
-- **`OPENCODE_CONFIG_DIR` adds a config root, it does not move one.** The reported `config` root stays `~/.config/opencode`, and skills, agents, and `opencode.json` load from *both* it and the override (the Tabnine wrapper sets the override to `~/.tabnine/opencode/config`). Either is a valid target, but installing the same `name` into both shadows one silently.
-- **`AGENTS.md` is the exception: it loads from the config root only.** So if the user targets the override root, their skills and agents work there but a global `AGENTS.md` written alongside them is never read — it belongs at `~/.config/opencode/AGENTS.md` regardless of target scope. Say so when the user picks the override root, since `/migrate-context` will not be able to follow their choice.
 - **opencode's MCP env key is `environment`.** An `env` key is accepted by the schema and then ignored, so the server starts with none of its variables and fails in a way that looks unrelated.
 - **MCP timeout defaults differ 120-fold.** Tabnine 600000 ms, opencode 5000 ms.
 - **Duplicate `name` is silent.** opencode logs `duplicate skill name` to the log only; the last copy scanned wins and the other never runs.
