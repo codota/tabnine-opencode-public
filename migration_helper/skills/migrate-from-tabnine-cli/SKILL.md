@@ -204,6 +204,8 @@ After all writes succeed, run through this order — no step is skippable:
 
 Environment facts that defy reasonable assumptions. Read before Phase 1.
 
+- **`OPENCODE_CONFIG_DIR` adds a config root for skills, agents and `opencode.json`.** They load from *both* `~/.config/opencode` and the override (the Tabnine wrapper sets the override to `~/.tabnine/opencode/config`). The global `AGENTS.md` does not work this way: it is read from the config root only, which under the launcher is the override. Installing the same `name` into both roots shadows one silently.
+- **`tabnine debug paths` misreports the active config root.** It prints `config  ~/.config/opencode` even when the launcher has redirected it, and disagrees with `tabnine debug config` on the same machine. Do not use it to decide where anything goes.
 - **opencode's MCP env key is `environment`.** An `env` key is accepted by the schema and then ignored, so the server starts with none of its variables and fails in a way that looks unrelated.
 - **MCP timeout defaults differ 120-fold.** Tabnine 600000 ms, opencode 5000 ms.
 - **Duplicate `name` is silent.** opencode logs `duplicate skill name` to the log only; the last copy scanned wins and the other never runs.
