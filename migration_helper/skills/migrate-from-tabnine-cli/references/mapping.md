@@ -110,7 +110,7 @@ Enablement (`~/.tabnine/agent/mcp-server-enablement.json`):
 { "playwright": { "enabled": false } }
 ```
 
-Target (`~/.config/opencode/opencode.json`):
+Target (`~/.tabnine/opencode/config/opencode.json`):
 
 ```json
 {
@@ -240,7 +240,7 @@ description: Manage Jira issues …
 You are a Jira and Confluence management specialist. …
 ```
 
-Target (`~/.config/opencode/agents/jira-issue-manager.md`), with the user picking `subagent` mode:
+Target (`~/.tabnine/opencode/config/agents/jira-issue-manager.md`), with the user picking `subagent` mode:
 
 ```markdown
 ---
@@ -276,7 +276,7 @@ Check @{README.md} for the runbook.
 """
 ```
 
-Target (`~/.config/opencode/command/deploy.md`):
+Target (`~/.tabnine/opencode/config/command/deploy.md`):
 
 ```markdown
 ---

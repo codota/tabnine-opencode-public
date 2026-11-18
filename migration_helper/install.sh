@@ -4,7 +4,7 @@
 # /migrate-context) into an opencode configuration directory.
 #
 # Usage:
-#   ./install.sh                 # install globally into ~/.config/opencode/
+#   ./install.sh                 # install globally into ~/.tabnine/opencode/config/
 #   ./install.sh --project       # install into ./.opencode/ in the current directory
 #   ./install.sh --overwrite     # skip diff prompts, overwrite existing files
 #   ./install.sh --help          # show usage
@@ -34,7 +34,7 @@ Usage:
 
 Options:
     --project    Install into ./.opencode/ (project scope) instead of
-                 ~/.config/opencode/ (global scope, the default).
+                 ~/.tabnine/opencode/config/ (global scope, the default).
     --overwrite  Overwrite existing target files without prompting.
     --help, -h   Show this message and exit.
 
@@ -45,7 +45,7 @@ The installer copies:
     commands/migrate.md               -> <target>/commands/migrate.md
     commands/migrate-context.md       -> <target>/commands/migrate-context.md
 
-Where <target> is either ~/.config/opencode or ./.opencode.
+Where <target> is either ~/.tabnine/opencode/config or ./.opencode.
 
 You can also install manually. See the README for the copy commands.
 EOF
@@ -93,7 +93,7 @@ fi
 # -----------------------------------------------------------------------------
 
 if [[ "$TARGET_SCOPE" == "global" ]]; then
-    TARGET_DIR="$HOME/.config/opencode"
+    TARGET_DIR="$HOME/.tabnine/opencode/config"
 else
     TARGET_DIR="$PWD/.opencode"
 fi

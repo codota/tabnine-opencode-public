@@ -6,7 +6,7 @@ Skip this entirely unless the user asks for it.
 
 These commands each start a fresh process and read config from disk, so they report the migrated state immediately — a restart is not needed for them to be accurate. The restart is needed for the user's own *running* session, which keeps the config it loaded at launch. So a green result here plus a still-broken session means "restart", not "migration failed".
 
-Three commands settle whether opencode actually loaded the migration. Run them from the project directory, and export `OPENCODE_CONFIG_DIR` first if the user's launcher sets it, so you reproduce their real environment:
+Three commands settle whether opencode actually loaded the migration. Run them from the project directory:
 
 ```
 opencode debug paths    # confirms which directory is the global config root
